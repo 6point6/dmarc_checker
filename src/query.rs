@@ -26,76 +26,57 @@ const DNS_SERVERS: &[&str] = &[
 
 const SERVER_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(200);
 
-pub struct Querier {
-    pub client: SyncClient<UdpClientConnection>,
-}
+pub fn try_dmarc_query(domain_name: &str) -> Result<Option<String>, String> {
+    loop {
+        for s in DNS_SERVERS.iter() {
+            let soc_addr: std::net::SocketAddr = s.parse().map_err(|e| fmt_err!("{}", e))?;
+            let conn = UdpClientConnection::with_timeout(soc_addr, SERVER_TIMEOUT).unwrap();
+            let client = SyncClient::new(conn);
 
-impl Querier {
-    pub fn new(dns_server: &str) -> Result<Self, String> {
-        let dns_ip_port = format!("{}:53", dns_server);
-
-        let soc_addr: std::net::SocketAddr = dns_ip_port.parse().map_err(|e| fmt_err!("{}", e))?;
-
-        let con = UdpClientConnection::new(soc_addr).unwrap();
-
-        Ok(Self {
-            client: SyncClient::new(con),
-        })
-    }
-
-    pub fn try_dmarc_query(domain_name: &str) -> Result<Option<String>, String> {
-        loop {
-            for (i, s) in DNS_SERVERS.iter().enumerate() {
-                let soc_addr: std::net::SocketAddr = s.parse().map_err(|e| fmt_err!("{}", e))?;
-                let conn = UdpClientConnection::with_timeout(soc_addr, SERVER_TIMEOUT).unwrap();
-                let client = SyncClient::new(conn);
-
-                match Self::dmarc(domain_name, client) {
-                    Ok(r) => return Ok(r),
-                    Err(e) => match e.kind() {
-                        ClientErrorKind::Timeout => {
-                            info!("Request timeout for: {} - trying next dns server", s);
-                            continue;
-                        }
-                        e @ _ => return Err(fmt_err!("{}", e)),
-                    },
-                }
+            match dmarc(domain_name, client) {
+                Ok(r) => return Ok(r),
+                Err(e) => match e.kind() {
+                    ClientErrorKind::Timeout => {
+                        info!("Request timeout for: {} - trying next dns server", s);
+                        continue;
+                    }
+                    e @ _ => return Err(fmt_err!("{}", e)),
+                },
             }
         }
     }
+}
 
-    fn dmarc(
-        domain_name: &str,
-        client: SyncClient<UdpClientConnection>,
-    ) -> Result<Option<String>, ClientError> {
-        let name =
-            Name::from_str(&format!("_dmarc.{}", domain_name)).map_err(|e| fmt_err!("{}", e))?;
+fn dmarc(
+    domain_name: &str,
+    client: SyncClient<UdpClientConnection>,
+) -> Result<Option<String>, ClientError> {
+    let name = Name::from_str(&format!("_dmarc.{}", domain_name)).map_err(|e| fmt_err!("{}", e))?;
 
-        let r = client.query(&name, DNSClass::IN, RecordType::TXT)?;
+    let r = client.query(&name, DNSClass::IN, RecordType::TXT)?;
 
-        let a = r.answers();
+    let a = r.answers();
 
-        if a.len() == 0 {
-            return Ok(None);
-        }
-
-        let dmarc_result = match a[0].rdata().as_txt().and_then(|t| Some(t.txt_data())) {
-            Some(r) => r,
-            None => return Ok(None),
-        };
-
-        let txt = dmarc_result
-            .iter()
-            .map(|i| std::str::from_utf8(i))
-            .try_fold(String::new(), |a, i| {
-                i.map(|i| {
-                    let mut a = a;
-                    a.push_str(i);
-                    a
-                })
-            })
-            .map_err(|e| fmt_err!("{}", e))?;
-
-        Ok(Some(txt))
+    if a.len() == 0 {
+        return Ok(None);
     }
+
+    let dmarc_result = match a[0].rdata().as_txt().and_then(|t| Some(t.txt_data())) {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+
+    let txt = dmarc_result
+        .iter()
+        .map(|i| std::str::from_utf8(i))
+        .try_fold(String::new(), |a, i| {
+            i.map(|i| {
+                let mut a = a;
+                a.push_str(i);
+                a
+            })
+        })
+        .map_err(|e| fmt_err!("{}", e))?;
+
+    Ok(Some(txt))
 }

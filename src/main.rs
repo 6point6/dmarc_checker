@@ -65,7 +65,7 @@ fn main() -> Result<(), ()> {
             entry.map_err(|e| print_err!("Failed to deserialize entry - {}", e))?;
 
         let dmarc_txt_opt: Option<String> =
-            query::Querier::try_dmarc_query(&domain_name.0).map_err(|e| eprintln!("{}", e))?;
+            query::try_dmarc_query(&domain_name.0).map_err(|e| eprintln!("{}", e))?;
 
         let dmarc = parse::Dmarc::new(&domain_name.0, dmarc_txt_opt);
         info!("{:#?}", &dmarc);
