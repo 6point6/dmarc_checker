@@ -22,7 +22,7 @@ impl Querier {
         })
     }
 
-    pub fn dmarc(&self, domain: &str) -> Result<String, String> {
+    pub fn dmarc(&self, domain: &str) -> Result<Option<String>, String> {
         let name = Name::from_str(domain).map_err(|e| fmt_err!("{}", e))?;
 
         let r = self
@@ -34,7 +34,14 @@ impl Querier {
 
         println!("answers: {:#X?}", a);
 
-        let dmarc_result = a[0].rdata().as_txt().unwrap().txt_data();
+        if a.len() == 0 {
+            return Ok(None)
+        }
+
+        let dmarc_result = match a[0].rdata().as_txt().and_then(|t| Some(t.txt_data())) {
+            Some(r) => r,
+            None => return Ok(None),
+        };
 
         let txt = dmarc_result
             .iter()
@@ -48,6 +55,6 @@ impl Querier {
             })
             .map_err(|e| fmt_err!("{}", e))?;
 
-        Ok(txt)
+        Ok(Some(txt))
     }
 }

@@ -33,8 +33,12 @@ fn main() -> Result<(), ()> {
 
     let q = query::Querier::new("1.1.1.1:53").map_err(|e| eprintln!("{}", e))?;
 
-    let r = q.dmarc("_dmarc.google.co.uk")
-        .map_err(|e| eprintln!("{}", e))?;
+    let url = "_dmarc.6point6.co.uk";
+
+    let r = match q.dmarc(url).map_err(|e| eprintln!("{}", e))? {
+        Some(r) => r,
+        None => return Ok(eprintln!("No dmarc record for url: {}", url)),
+    };
 
     let dmarc_parsed = parse::DmarcParsed::new(&r);
     let dmarc = parse::Dmarc::new(dmarc_parsed);

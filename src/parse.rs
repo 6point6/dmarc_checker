@@ -89,6 +89,7 @@ pub struct Dmarc {
     sp: Option<TagAction>,
     adkim: Option<String>,
     aspf: Option<String>,
+    others: Option<Vec<String>>,
     invalid: Option<Vec<String>>,
     raw_data: String,
 }
@@ -105,6 +106,7 @@ impl Dmarc {
                 sp: None,
                 adkim: None,
                 aspf: None,
+                others: None,
                 invalid: dmarc_parsed.invalid_entries,
                 raw_data: dmarc_parsed.raw_txt,
             };
@@ -129,6 +131,20 @@ impl Dmarc {
                 .and_then(|adkim_entry| Some(adkim_entry.val.to_string())),
             aspf: match_tag(ASPF_TAG, &mut dmarc_entries)
                 .and_then(|aspf_entry| Some(aspf_entry.val.to_string())),
+            others: {
+                match dmarc_entries.is_empty() {
+                    true => None,
+                    false => {
+                        let mut others_tmp: Vec<String> =
+                            Vec::with_capacity(dmarc_entries.iter().count());
+                        for e in dmarc_entries {
+                            others_tmp.push(format!("{}={}", e.tag, e.val));
+                        }
+
+                        Some(others_tmp)
+                    }
+                }
+            },
             invalid: dmarc_parsed.invalid_entries,
             raw_data: dmarc_parsed.raw_txt,
         }
@@ -162,7 +178,11 @@ impl<'a> DmarcParsed<'a> {
                     &e[0..idx].trim(),
                     &e[idx + 1..e.len()].trim(),
                 )),
-                None => invalid_entries.push(e.to_string()),
+                None => {
+                    if !e.is_empty() {
+                        invalid_entries.push(e.to_string())
+                    }
+                }
             }
         }
 
@@ -180,6 +200,46 @@ impl<'a> DmarcParsed<'a> {
             dmarc_entries: dmarc_entries_opt,
             invalid_entries: invalid_entries_opt,
             raw_txt: txt.clone(),
+        }
+    }
+}
+
+enum DmarcFieldResult {
+    ValidConfig,
+    BadConfig(String),
+    Invalid(String),
+    NonExistant,
+}
+
+pub struct DmarcCheck {
+    v: DmarcFieldResult,
+    p: DmarcFieldResult,
+    sp: DmarcFieldResult,
+}
+
+impl DmarcCheck {
+    /*
+    pub fn new(dmarc: &Dmarc) -> Self {
+        Self {}
+    }*/
+
+    fn check_v(dmarc: &Dmarc) -> DmarcFieldResult {
+        match &dmarc.v {
+            Some(v) => match v {
+                DmarcVersion::Dmarc1 => DmarcFieldResult::ValidConfig,
+                DmarcVersion::Invalid(s) => DmarcFieldResult::Invalid(s.clone()),
+            },
+            None => DmarcFieldResult::NonExistant,
+        }
+    }
+
+    fn check_p(dmarc: &Dmarc) -> DmarcFieldResult {
+        match &dmarc.p {
+            Some(v) => match v {
+                TagAction::Invalid(s) => DmarcFieldResult::Invalid(s.clone()),
+                _ => DmarcFieldResult::ValidConfig,
+            },
+            None => DmarcFieldResult::NonExistant,
         }
     }
 }
