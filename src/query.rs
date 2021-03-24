@@ -13,7 +13,9 @@ pub struct Querier {
 
 impl Querier {
     pub fn new(dns_server: &str) -> Result<Self, String> {
-        let soc_addr: std::net::SocketAddr = dns_server.parse().map_err(|e| fmt_err!("{}", e))?;
+        let dns_ip_port = format!("{}:53", dns_server);
+
+        let soc_addr: std::net::SocketAddr = dns_ip_port.parse().map_err(|e| fmt_err!("{}", e))?;
 
         let con = UdpClientConnection::new(soc_addr).unwrap();
 
@@ -22,8 +24,9 @@ impl Querier {
         })
     }
 
-    pub fn dmarc(&self, domain: &str) -> Result<Option<String>, String> {
-        let name = Name::from_str(domain).map_err(|e| fmt_err!("{}", e))?;
+    pub fn dmarc(&self, domain_name: &str) -> Result<Option<String>, String> {
+        let name =
+            Name::from_str(&format!("_dmarc.{}", domain_name)).map_err(|e| fmt_err!("{}", e))?;
 
         let r = self
             .client
@@ -32,10 +35,8 @@ impl Querier {
 
         let a = r.answers();
 
-        println!("answers: {:#X?}", a);
-
         if a.len() == 0 {
-            return Ok(None)
+            return Ok(None);
         }
 
         let dmarc_result = match a[0].rdata().as_txt().and_then(|t| Some(t.txt_data())) {

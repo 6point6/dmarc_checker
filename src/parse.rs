@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize, Serializer};
+
 const DMARC1: &str = "DMARC1";
 
 const V_TAG: &str = "v";
@@ -14,10 +16,32 @@ const TAG_QURANTINE: &str = "qurantine";
 const TAG_REJECT: &str = "reject";
 const TAG_INVALID: &str = "INVALID";
 
+#[derive(Debug, Deserialize)]
+pub struct DomainName(pub String);
+
+#[derive(Serialize)]
+pub struct ParseResult {
+    pub domain_name: String,
+}
+
 #[derive(Debug)]
 enum DmarcVersion {
     Dmarc1,
     Invalid(String),
+}
+
+impl Serialize for DmarcVersion {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            Self::Dmarc1 => serializer.serialize_unit_variant(DMARC1, 0, "Dmarc1"),
+            Self::Invalid(ref s) => {
+                serializer.serialize_newtype_variant("Invalid", 1, "Invalid", s)
+            }
+        }
+    }
 }
 
 impl DmarcVersion {
@@ -45,6 +69,22 @@ enum TagAction {
     Qurantine,
     Reject,
     Invalid(String),
+}
+
+impl Serialize for TagAction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            Self::None => serializer.serialize_unit_variant("None", 0, TAG_NONE),
+            Self::Qurantine => serializer.serialize_unit_variant("Quarantine", 1, TAG_QURANTINE),
+            Self::Reject => serializer.serialize_unit_variant("Reject", 2, TAG_REJECT),
+            Self::Invalid(ref s) => {
+                serializer.serialize_newtype_variant("Invalid", 3, "Invalid", s)
+            }
+        }
+    }
 }
 
 impl TagAction {
@@ -79,7 +119,7 @@ impl<'a> DmarcEntry<'a> {
         Self { tag, val }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Dmarc {
     v: Option<DmarcVersion>,
     p: Option<TagAction>,
@@ -94,22 +134,36 @@ pub struct Dmarc {
     raw_data: String,
 }
 
+impl Default for Dmarc {
+    fn default() -> Self {
+        Self {
+            v: Default::default(),
+            p: Default::default(),
+            pct: Default::default(),
+            rua: Default::default(),
+            ruf: Default::default(),
+            sp: Default::default(),
+            adkim: Default::default(),
+            aspf: Default::default(),
+            others: Default::default(),
+            invalid: Default::default(),
+            raw_data: Default::default(),
+        }
+    }
+}
+
 impl Dmarc {
-    pub fn new(dmarc_parsed: DmarcParsed) -> Self {
+    pub fn new(txt: Option<String>) -> Self {
+        let dmarc_parsed = match txt {
+            Some(ref r) => DmarcParsed::new(r),
+            None => return Self::default(),
+        };
+
         if dmarc_parsed.dmarc_entries.is_none() {
-            return Self {
-                v: None,
-                p: None,
-                pct: None,
-                rua: None,
-                ruf: None,
-                sp: None,
-                adkim: None,
-                aspf: None,
-                others: None,
-                invalid: dmarc_parsed.invalid_entries,
-                raw_data: dmarc_parsed.raw_txt,
-            };
+            let mut r = Self::default();
+            r.invalid = dmarc_parsed.invalid_entries;
+            r.raw_data = dmarc_parsed.raw_txt;
+            return r;
         }
 
         let mut dmarc_entries = dmarc_parsed.dmarc_entries.unwrap();
@@ -152,14 +206,14 @@ impl Dmarc {
 }
 
 #[derive(Debug)]
-pub struct DmarcParsed<'a> {
+struct DmarcParsed<'a> {
     dmarc_entries: Option<Vec<DmarcEntry<'a>>>,
     invalid_entries: Option<Vec<String>>,
     raw_txt: String,
 }
 
 impl<'a> DmarcParsed<'a> {
-    pub fn new(txt: &'a String) -> Self {
+    fn new(txt: &'a String) -> Self {
         if txt.is_empty() {
             return Self {
                 dmarc_entries: None,
@@ -214,6 +268,7 @@ enum DmarcFieldResult {
 pub struct DmarcCheck {
     v: DmarcFieldResult,
     p: DmarcFieldResult,
+    v_and_p: DmarcFieldResult,
     sp: DmarcFieldResult,
 }
 

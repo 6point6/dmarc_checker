@@ -13,3 +13,10 @@ macro_rules! fmt_err {
         )
     }}
 }
+
+macro_rules! print_err {
+    ($($arg:tt)*) => {{
+        let res = fmt_err!($($arg)*);
+        eprintln!("{}", res);
+    }}
+}
