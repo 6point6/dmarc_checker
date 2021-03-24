@@ -2,10 +2,29 @@ use crate::fmt_err;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 use trust_dns_client::client::{Client, ClientConnection, SyncClient};
+use trust_dns_client::error::{ClientError, ClientErrorKind};
 use trust_dns_client::op::DnsResponse;
 use trust_dns_client::rr::{DNSClass, Name, RData, Record, RecordType};
 use trust_dns_client::udp::UdpClientConnection;
 use trust_dns_proto::DnsStreamHandle;
+
+const DNS_SERVERS: &[&str] = &[
+    "8.8.8.8:53",
+    "8.8.4.4:53",
+    "9.9.9.9:53",
+    "149.122.122.122:53",
+    "208.67.222.222:53",
+    "1.1.1.1:53",
+    "1.0.0.1:53",
+    "185.228.168.9:53",
+    "185.228.169.9:53",
+    "76.76.19.19:53",
+    "76.223.122.150:53",
+    "94.140.14.14:53",
+    "94.140.15.15:53",
+];
+
+const SERVER_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(200);
 
 pub struct Querier {
     pub client: SyncClient<UdpClientConnection>,
@@ -24,14 +43,35 @@ impl Querier {
         })
     }
 
-    pub fn dmarc(&self, domain_name: &str) -> Result<Option<String>, String> {
+    pub fn try_dmarc_query(domain_name: &str) -> Result<Option<String>, String> {
+        loop {
+            for (i, s) in DNS_SERVERS.iter().enumerate() {
+                let soc_addr: std::net::SocketAddr = s.parse().map_err(|e| fmt_err!("{}", e))?;
+                let conn = UdpClientConnection::with_timeout(soc_addr, SERVER_TIMEOUT).unwrap();
+                let client = SyncClient::new(conn);
+
+                match Self::dmarc(domain_name, client) {
+                    Ok(r) => return Ok(r),
+                    Err(e) => match e.kind() {
+                        ClientErrorKind::Timeout => {
+                            info!("Request timeout for: {} - trying next dns server", s);
+                            continue;
+                        }
+                        e @ _ => return Err(fmt_err!("{}", e)),
+                    },
+                }
+            }
+        }
+    }
+
+    fn dmarc(
+        domain_name: &str,
+        client: SyncClient<UdpClientConnection>,
+    ) -> Result<Option<String>, ClientError> {
         let name =
             Name::from_str(&format!("_dmarc.{}", domain_name)).map_err(|e| fmt_err!("{}", e))?;
 
-        let r = self
-            .client
-            .query(&name, DNSClass::IN, RecordType::TXT)
-            .map_err(|e| fmt_err!("{}", e))?;
+        let r = client.query(&name, DNSClass::IN, RecordType::TXT)?;
 
         let a = r.answers();
 

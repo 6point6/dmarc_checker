@@ -60,14 +60,12 @@ fn main() -> Result<(), ()> {
 
     let mut output_file_writer = csv::Writer::from_writer(out_file);
 
-    let q = query::Querier::new(dns_server).map_err(|e| eprintln!("{}", e))?;
-
     for entry in domain_list_reader.deserialize::<parse::DomainName>() {
         let domain_name: parse::DomainName =
             entry.map_err(|e| print_err!("Failed to deserialize entry - {}", e))?;
 
         let dmarc_txt_opt: Option<String> =
-            q.dmarc(&domain_name.0).map_err(|e| eprintln!("{}", e))?;
+            query::Querier::try_dmarc_query(&domain_name.0).map_err(|e| eprintln!("{}", e))?;
 
         let dmarc = parse::Dmarc::new(&domain_name.0, dmarc_txt_opt);
         info!("{:#?}", &dmarc);
