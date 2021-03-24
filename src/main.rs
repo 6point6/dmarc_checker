@@ -55,25 +55,32 @@ fn main() -> Result<(), ()> {
 
     let mut domain_list_reader: csv::Reader<&[u8]> = csv::Reader::from_reader(&domain_list[..]);
 
-    let output_file = File::create(output_file)
+    let out_file = File::create(output_file)
         .map_err(|e| print_err!("Failed to create output file: {} - {}", output_file, e))?;
 
-    let output_file_writer = csv::Writer::from_writer(output_file);
+    let mut output_file_writer = csv::Writer::from_writer(out_file);
 
     let q = query::Querier::new(dns_server).map_err(|e| eprintln!("{}", e))?;
 
     for entry in domain_list_reader.deserialize::<parse::DomainName>() {
         let domain_name: parse::DomainName =
             entry.map_err(|e| print_err!("Failed to deserialize entry - {}", e))?;
-        
-        let dmarc_txt_opt: Option<String> = q.dmarc(&domain_name.0).map_err(|e| eprintln!("{}", e))?;
 
-        let dmarc = parse::Dmarc::new(dmarc_txt_opt);
-        
-        info!("{:#?}", dmarc);
+        let dmarc_txt_opt: Option<String> =
+            q.dmarc(&domain_name.0).map_err(|e| eprintln!("{}", e))?;
 
-        
+        let dmarc = parse::Dmarc::new(&domain_name.0, dmarc_txt_opt);
+        info!("{:#?}", &dmarc);
+
+        output_file_writer
+            .serialize::<parse::Dmarc>(dmarc)
+            .map_err(|e| print_err!("Failed to serialze data for record - {}", e))?;
+
     }
+
+    output_file_writer
+        .flush()
+        .map_err(|e| print_err!("Error flushing output file: {} - {}", output_file, e))?;
 
     Ok(())
 }

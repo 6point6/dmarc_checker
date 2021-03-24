@@ -12,7 +12,7 @@ const ADKIM_TAG: &str = "adkim";
 const ASPF_TAG: &str = "aspf";
 
 const TAG_NONE: &str = "none";
-const TAG_QURANTINE: &str = "qurantine";
+const TAG_QURANTINE: &str = "quarantine";
 const TAG_REJECT: &str = "reject";
 const TAG_INVALID: &str = "INVALID";
 
@@ -121,6 +121,7 @@ impl<'a> DmarcEntry<'a> {
 }
 #[derive(Debug, Serialize)]
 pub struct Dmarc {
+    domain_name: String,
     v: Option<DmarcVersion>,
     p: Option<TagAction>,
     pct: Option<String>, // TODO: Should change this to a u8 later
@@ -129,14 +130,15 @@ pub struct Dmarc {
     sp: Option<TagAction>,
     adkim: Option<String>,
     aspf: Option<String>,
-    others: Option<Vec<String>>,
-    invalid: Option<Vec<String>>,
+    others: Option<String>,
+    invalid: Option<String>,
     raw_data: String,
 }
 
 impl Default for Dmarc {
     fn default() -> Self {
         Self {
+            domain_name: Default::default(),
             v: Default::default(),
             p: Default::default(),
             pct: Default::default(),
@@ -153,22 +155,28 @@ impl Default for Dmarc {
 }
 
 impl Dmarc {
-    pub fn new(txt: Option<String>) -> Self {
+    pub fn new(domain_name: &str, txt: Option<String>) -> Self {
         let dmarc_parsed = match txt {
             Some(ref r) => DmarcParsed::new(r),
-            None => return Self::default(),
+            None => {
+                let mut res = Self::default();
+                res.domain_name = domain_name.to_string();
+                return res;
+            }
         };
 
         if dmarc_parsed.dmarc_entries.is_none() {
-            let mut r = Self::default();
-            r.invalid = dmarc_parsed.invalid_entries;
-            r.raw_data = dmarc_parsed.raw_txt;
-            return r;
+            let mut res = Self::default();
+            res.domain_name = domain_name.to_string();
+            res.invalid = dmarc_parsed.invalid_entries;
+            res.raw_data = dmarc_parsed.raw_txt;
+            return res;
         }
 
         let mut dmarc_entries = dmarc_parsed.dmarc_entries.unwrap();
 
         Self {
+            domain_name: domain_name.to_string(),
             v: match_tag(V_TAG, &mut dmarc_entries)
                 .and_then(|v_entry| Some(DmarcVersion::to_ver(v_entry.val))),
             p: match_tag(P_TAG, &mut dmarc_entries)
@@ -189,10 +197,9 @@ impl Dmarc {
                 match dmarc_entries.is_empty() {
                     true => None,
                     false => {
-                        let mut others_tmp: Vec<String> =
-                            Vec::with_capacity(dmarc_entries.iter().count());
+                        let mut others_tmp = String::new();
                         for e in dmarc_entries {
-                            others_tmp.push(format!("{}={}", e.tag, e.val));
+                            others_tmp.push_str(&format!("{}={} ", e.tag, e.val));
                         }
 
                         Some(others_tmp)
@@ -208,22 +215,24 @@ impl Dmarc {
 #[derive(Debug)]
 struct DmarcParsed<'a> {
     dmarc_entries: Option<Vec<DmarcEntry<'a>>>,
-    invalid_entries: Option<Vec<String>>,
+    invalid_entries: Option<String>,
     raw_txt: String,
 }
 
 impl<'a> DmarcParsed<'a> {
     fn new(txt: &'a String) -> Self {
+        let raw_txt_quoted = format!("\"{}\"", txt.clone());
+
         if txt.is_empty() {
             return Self {
                 dmarc_entries: None,
                 invalid_entries: None,
-                raw_txt: txt.clone(),
+                raw_txt: raw_txt_quoted,
             };
         }
 
         let mut dmarc_entries: Vec<DmarcEntry> = Vec::new();
-        let mut invalid_entries = Vec::new();
+        let mut invalid_entries = String::new();
         let entry_iter = txt.split(';');
 
         for e in entry_iter {
@@ -234,7 +243,7 @@ impl<'a> DmarcParsed<'a> {
                 )),
                 None => {
                     if !e.is_empty() {
-                        invalid_entries.push(e.to_string())
+                        invalid_entries.push_str(e)
                     }
                 }
             }
@@ -253,7 +262,7 @@ impl<'a> DmarcParsed<'a> {
         Self {
             dmarc_entries: dmarc_entries_opt,
             invalid_entries: invalid_entries_opt,
-            raw_txt: txt.clone(),
+            raw_txt: raw_txt_quoted,
         }
     }
 }
