@@ -36,7 +36,7 @@ impl Serialize for DmarcVersion {
         S: Serializer,
     {
         match *self {
-            Self::Dmarc1 => serializer.serialize_unit_variant(DMARC1, 0, "Dmarc1"),
+            Self::Dmarc1 => serializer.serialize_unit_variant(DMARC1, 0, DMARC1),
             Self::Invalid(ref s) => {
                 serializer.serialize_newtype_variant("Invalid", 1, "Invalid", s)
             }

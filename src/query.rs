@@ -6,7 +6,6 @@ use trust_dns_client::error::{ClientError, ClientErrorKind};
 use trust_dns_client::op::DnsResponse;
 use trust_dns_client::rr::{DNSClass, Name, RData, Record, RecordType};
 use trust_dns_client::udp::UdpClientConnection;
-use trust_dns_proto::DnsStreamHandle;
 
 const DNS_SERVERS: &[&str] = &[
     "8.8.8.8:53",
@@ -26,7 +25,7 @@ const DNS_SERVERS: &[&str] = &[
 
 const SERVER_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(200);
 
-pub fn try_dmarc_query(domain_name: &str) -> Result<Option<String>, String> {
+pub fn try_dmarc_query(domain_name: &str) -> Result<Option<StringRecords>, String> {
     loop {
         for s in DNS_SERVERS.iter() {
             let soc_addr: std::net::SocketAddr = s.parse().map_err(|e| fmt_err!("{}", e))?;
@@ -47,36 +46,52 @@ pub fn try_dmarc_query(domain_name: &str) -> Result<Option<String>, String> {
     }
 }
 
+pub enum StringRecords {
+    Single(Option<String>),
+    Multiple(Vec<Option<String>>),
+}
+
+impl StringRecords {
+    fn new(r: &[Record]) -> Option<Self> {
+        match r.len() {
+            0 => None,
+            1 => {
+                Some(Self::Single(record_to_string(&r[0])))
+            }
+            n @ _ => {
+                let mut strings: Vec<Option<String>> = Vec::with_capacity(n);
+
+                for i in r.iter() {
+                    strings.push(record_to_string(i))
+                }
+
+                Some(Self::Multiple(strings))
+            }
+        }
+    }
+}
+
+fn record_to_string(r: &Record) -> Option<String> {
+    match r.rdata().to_record_type() {
+        RecordType::CNAME => r
+            .rdata()
+            .as_cname()
+            .and_then(|cname| Some(cname.to_string())),
+        RecordType::TXT => r
+            .rdata()
+            .as_txt()
+            .and_then(|txt_data| Some(txt_data.to_string())),
+        _ => None,
+    }
+}
+
 fn dmarc(
     domain_name: &str,
     client: SyncClient<UdpClientConnection>,
-) -> Result<Option<String>, ClientError> {
+) -> Result<Option<StringRecords>, ClientError> {
     let name = Name::from_str(&format!("_dmarc.{}", domain_name)).map_err(|e| fmt_err!("{}", e))?;
+    let dns_response = client.query(&name, DNSClass::IN, RecordType::TXT)?;
+    let records = dns_response.answers();
 
-    let r = client.query(&name, DNSClass::IN, RecordType::TXT)?;
-
-    let a = r.answers();
-
-    if a.len() == 0 {
-        return Ok(None);
-    }
-
-    let dmarc_result = match a[0].rdata().as_txt().and_then(|t| Some(t.txt_data())) {
-        Some(r) => r,
-        None => return Ok(None),
-    };
-
-    let txt = dmarc_result
-        .iter()
-        .map(|i| std::str::from_utf8(i))
-        .try_fold(String::new(), |a, i| {
-            i.map(|i| {
-                let mut a = a;
-                a.push_str(i);
-                a
-            })
-        })
-        .map_err(|e| fmt_err!("{}", e))?;
-
-    Ok(Some(txt))
+    Ok(StringRecords::new(records))
 }

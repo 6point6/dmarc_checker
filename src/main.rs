@@ -48,7 +48,6 @@ fn main() -> Result<(), ()> {
 
     let input_file: &str = args.value_of("domain_list").unwrap();
     let output_file: &str = args.value_of("output_file").unwrap();
-    let dns_server: &str = args.value_of("dns_server").unwrap_or("1.1.1.1");
 
     let domain_list: Vec<u8> = std::fs::read(input_file)
         .map_err(|e| print_err!("File read error for: {} - {}", input_file, e))?;
@@ -64,16 +63,43 @@ fn main() -> Result<(), ()> {
         let domain_name: parse::DomainName =
             entry.map_err(|e| print_err!("Failed to deserialize entry - {}", e))?;
 
-        let dmarc_txt_opt: Option<String> =
+        let string_records: Option<query::StringRecords> =
             query::try_dmarc_query(&domain_name.0).map_err(|e| eprintln!("{}", e))?;
 
-        let dmarc = parse::Dmarc::new(&domain_name.0, dmarc_txt_opt);
-        info!("{:#?}", &dmarc);
+        match string_records {
+            Some(sr) => match sr {
+                query::StringRecords::Single(s) => {
+                    let dmarc = parse::Dmarc::new(&domain_name.0, s);
+                    info!("{:#?}", &dmarc);
 
-        output_file_writer
-            .serialize::<parse::Dmarc>(dmarc)
-            .map_err(|e| print_err!("Failed to serialze data for record - {}", e))?;
+                    output_file_writer
+                        .serialize::<parse::Dmarc>(dmarc)
+                        .map_err(|e| {
+                            print_err!("Failed to serialze data in Single record - {}", e)
+                        })?;
+                }
+                query::StringRecords::Multiple(vs) => {
+                    for s in vs {
+                        let dmarc = parse::Dmarc::new(&domain_name.0, s);
+                        info!("{:#?}", &dmarc);
 
+                        output_file_writer
+                            .serialize::<parse::Dmarc>(dmarc)
+                            .map_err(|e| {
+                                print_err!("Failed to serialze data for in Multiple record - {}", e)
+                            })?;
+                    }
+                }
+            },
+            None => {
+                let dmarc = parse::Dmarc::new(&domain_name.0, None);
+                info!("{:#?}", &dmarc);
+
+                output_file_writer
+                    .serialize::<parse::Dmarc>(dmarc)
+                    .map_err(|e| print_err!("Failed to serialze data fo empty record - {}", e))?;
+            }
+        }
     }
 
     output_file_writer
