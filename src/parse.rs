@@ -97,15 +97,6 @@ impl TagAction {
             _ => Self::Invalid(p_tag_val.to_string()),
         }
     }
-
-    fn to_string(&self) -> String {
-        match self {
-            Self::None => TAG_NONE.to_string(),
-            Self::Qurantine => TAG_QURANTINE.to_string(),
-            Self::Reject => TAG_REJECT.to_string(),
-            Self::Invalid(_) => TAG_INVALID.to_string(),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -282,11 +273,6 @@ pub struct DmarcCheck {
 }
 
 impl DmarcCheck {
-    /*
-    pub fn new(dmarc: &Dmarc) -> Self {
-        Self {}
-    }*/
-
     fn check_v(dmarc: &Dmarc) -> DmarcFieldResult {
         match &dmarc.v {
             Some(v) => match v {

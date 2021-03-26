@@ -1,9 +1,7 @@
 use crate::fmt_err;
-use std::net::Ipv4Addr;
 use std::str::FromStr;
 use trust_dns_client::client::{Client, ClientConnection, SyncClient};
 use trust_dns_client::error::{ClientError, ClientErrorKind};
-use trust_dns_client::op::DnsResponse;
 use trust_dns_client::rr::{DNSClass, Name, RData, Record, RecordType};
 use trust_dns_client::udp::UdpClientConnection;
 
@@ -55,9 +53,7 @@ impl StringRecords {
     fn new(r: &[Record]) -> Option<Self> {
         match r.len() {
             0 => None,
-            1 => {
-                Some(Self::Single(record_to_string(&r[0])))
-            }
+            1 => Some(Self::Single(record_to_string(&r[0]))),
             n @ _ => {
                 let mut strings: Vec<Option<String>> = Vec::with_capacity(n);
 

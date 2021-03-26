@@ -1,8 +1,6 @@
 #![feature(backtrace)]
 use clap::{App, Arg};
-use std::fs;
 use std::fs::File;
-use trust_dns_client::op::DnsResponse;
 mod query;
 #[macro_use]
 extern crate log;
@@ -30,15 +28,6 @@ fn main() -> Result<(), ()> {
                 .value_name("PARSED_DOMAIN_LIST_CSV")
                 .help("output file containing results")
                 .required(true)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("dns_server")
-                .short("d")
-                .long("dns_server")
-                .value_name("DNS_SERVER_IP")
-                .help("ip of dns server to resolve records with")
-                .required(false)
                 .takes_value(true),
         )
         .get_matches();
