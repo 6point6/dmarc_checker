@@ -1,99 +1,80 @@
-#![feature(backtrace)]
-use clap::{App, Arg};
-use std::fs::File;
-mod query;
-#[macro_use]
-extern crate log;
-#[macro_use]
-mod util;
+use csv_async::AsyncSerializer;
+use trust_dns_client::rr::Record;
+use tokio::sync::mpsc;
+use tokio::fs::File;
+
 mod parse;
+mod utils;
+mod query;
 
-fn main() -> Result<(), ()> {
-    let args = App::new("dmarc_checker")
-        .version("0.1")
-        .about("Checks for dmarc misconfigurations")
-        .arg(
-            Arg::with_name("domain_list")
-                .short("l")
-                .long("domain_list")
-                .value_name("DOMAIN_NAME_LIST_CSV")
-                .help("List of domain names to query")
-                .required(true)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("output_file")
-                .short("o")
-                .long("output_file")
-                .value_name("PARSED_DOMAIN_LIST_CSV")
-                .help("output file containing results")
-                .required(true)
-                .takes_value(true),
-        )
-        .get_matches();
+#[tokio::main]
+async fn main() {
 
-    env_logger::init();
-    info!("Welcome!");
+    let config = utils::Config::new();
+    let (tx, rx) = mpsc::channel(query::DNS_SERVERS.len());
+    
+    // Loop through domains in file provider by user
+    for domain_name in std::fs::read_to_string(config.input_domain_file).unwrap().lines() {
+        
+        // Convert domain name to string for tokio task
+        let domain_name = domain_name.to_string();
 
-    let input_file: &str = args.value_of("domain_list").unwrap();
-    let output_file: &str = args.value_of("output_file").unwrap();
+        // Clone Sender tx for task move
+        let tx = tx.clone();
 
-    let domain_list: Vec<u8> = std::fs::read(input_file)
-        .map_err(|e| print_err!("File read error for: {} - {}", input_file, e))?;
+        tokio::spawn(async move { 
+            query::try_query(domain_name, tx).await
+        });
+    }
+    // Close original Sender tx to prevent a dead lock
+    drop(tx);
 
-    let mut domain_list_reader: csv::Reader<&[u8]> = csv::Reader::from_reader(&domain_list[..]);
+    // Open asynchronous file writers and serializers
+    let output_dmarc_file = File::create(config.output_dmarc_file).await.unwrap();
+    let mut output_dmarc_filewriter = csv_async::AsyncSerializer::from_writer(output_dmarc_file);
+    
+    // Write output to csv file
+    output_dmarc_filewriter = write_dmarc_output_to_csv(output_dmarc_filewriter, rx).await;
 
-    let out_file = File::create(output_file)
-        .map_err(|e| print_err!("Failed to create output file: {} - {}", output_file, e))?;
+    // Flush filewriter buffers
+    let _ = output_dmarc_filewriter.flush();
+}
 
-    let mut output_file_writer = csv::Writer::from_writer(out_file);
+async fn write_dmarc_output_to_csv(mut output_dmarc_filewriter: AsyncSerializer<File>, 
+                                   mut rx: mpsc::Receiver<(String, Vec<Record>)>) -> AsyncSerializer<File> {
+    
+    // Recieve data from channel asynchronously
+    while let Some((domain_name, dns_respoonse_answers)) = rx.recv().await {
+        
+        println!("Scanned '{}'", &domain_name);
 
-    for entry in domain_list_reader.deserialize::<parse::DomainName>() {
-        let domain_name: parse::DomainName =
-            entry.map_err(|e| print_err!("Failed to deserialize entry - {}", e))?;
-
-        let string_records: Option<query::StringRecords> =
-            query::try_dmarc_query(&domain_name.0).map_err(|e| eprintln!("{}", e))?;
+        let string_records = parse::StringRecords::new(&dns_respoonse_answers);
 
         match string_records {
             Some(sr) => match sr {
-                query::StringRecords::Single(s) => {
-                    let dmarc = parse::Dmarc::new(&domain_name.0, s);
-                    info!("{:#?}", &dmarc);
-
-                    output_file_writer
-                        .serialize::<parse::Dmarc>(dmarc)
-                        .map_err(|e| {
-                            print_err!("Failed to serialze data in Single record - {}", e)
-                        })?;
-                }
-                query::StringRecords::Multiple(vs) => {
+                // Write single DMARC record
+                parse::StringRecords::Single(s) => {
+                    let dmarc = parse::Dmarc::new(&domain_name, s);
+                    output_dmarc_filewriter
+                        .serialize::<parse::Dmarc>(dmarc).await.unwrap()
+                },
+                // Write multiple DMARC record
+                parse::StringRecords::Multiple(vs) => {
                     for s in vs {
-                        let dmarc = parse::Dmarc::new(&domain_name.0, s);
-                        info!("{:#?}", &dmarc);
-
-                        output_file_writer
-                            .serialize::<parse::Dmarc>(dmarc)
-                            .map_err(|e| {
-                                print_err!("Failed to serialze data for in Multiple record - {}", e)
-                            })?;
+                    let dmarc = parse::Dmarc::new(&domain_name, s);
+                    output_dmarc_filewriter
+                        .serialize::<parse::Dmarc>(dmarc).await.unwrap()
                     }
-                }
+                },
             },
+            // No DMARC record
             None => {
-                let dmarc = parse::Dmarc::new(&domain_name.0, None);
-                info!("{:#?}", &dmarc);
-
-                output_file_writer
-                    .serialize::<parse::Dmarc>(dmarc)
-                    .map_err(|e| print_err!("Failed to serialze data fo empty record - {}", e))?;
-            }
+                let dmarc = parse::Dmarc::new(&domain_name, None);
+                output_dmarc_filewriter
+                    .serialize::<parse::Dmarc>(dmarc).await.unwrap()
+            },
         }
     }
 
-    output_file_writer
-        .flush()
-        .map_err(|e| print_err!("Error flushing output file: {} - {}", output_file, e))?;
-
-    Ok(())
+    output_dmarc_filewriter
 }

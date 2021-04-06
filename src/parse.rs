@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize, Serializer};
+use trust_dns_client::rr::{Record, RecordType};
 
 const DMARC1: &str = "DMARC1";
 
@@ -22,6 +23,29 @@ pub struct DomainName(pub String);
 #[derive(Serialize)]
 pub struct ParseResult {
     pub domain_name: String,
+}
+
+pub enum StringRecords {
+    Single(Option<String>),
+    Multiple(Vec<Option<String>>),
+}
+
+impl StringRecords {
+    pub fn new(r: &[Record]) -> Option<Self> {
+        match r.len() {
+            0 => None,
+            1 => Some(Self::Single(record_to_string(&r[0]))),
+            n @ _ => {
+                let mut strings: Vec<Option<String>> = Vec::with_capacity(n);
+
+                for i in r.iter() {
+                    strings.push(record_to_string(i))
+                }
+
+                Some(Self::Multiple(strings))
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -291,5 +315,19 @@ impl DmarcCheck {
             },
             None => DmarcFieldResult::NonExistant,
         }
+    }
+}
+
+fn record_to_string(r: &Record) -> Option<String> {
+    match r.rdata().to_record_type() {
+        RecordType::CNAME => r
+            .rdata()
+            .as_cname()
+            .and_then(|cname| Some(cname.to_string())),
+        RecordType::TXT => r
+            .rdata()
+            .as_txt()
+            .and_then(|txt_data| Some(txt_data.to_string())),
+        _ => None,
     }
 }
