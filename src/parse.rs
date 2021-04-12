@@ -25,6 +25,7 @@ pub struct ParseResult {
     pub domain_name: String,
 }
 
+#[derive(Debug)]
 pub enum StringRecords {
     Single(Option<String>),
     Multiple(Vec<Option<String>>),

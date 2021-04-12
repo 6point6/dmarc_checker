@@ -1,4 +1,4 @@
-use clap::{Arg, App};
+use clap::{App, Arg};
 
 pub struct Config {
     pub input_domain_file: String,
@@ -6,9 +6,7 @@ pub struct Config {
 }
 
 impl Config {
-
     pub fn new() -> Self {
-
         let args = App::new("dmarc_checker")
             .version("0.1")
             .about("Checks for dmarc misconfigurations")
@@ -30,11 +28,11 @@ impl Config {
                     .required(true)
                     .takes_value(true),
             )
-        .get_matches();
+            .get_matches();
 
         Self {
-            input_domain_file: String::from(args.value_of("input_domain_file").unwrap()), 
-            output_dmarc_file: String::from(args.value_of("output_dmarc_file").unwrap()), 
+            input_domain_file: String::from(args.value_of("input_domain_file").unwrap()),
+            output_dmarc_file: String::from(args.value_of("output_dmarc_file").unwrap()),
         }
     }
 }
@@ -59,4 +57,3 @@ macro_rules! print_err {
         eprintln!("{}", res);
     }}
 }
-

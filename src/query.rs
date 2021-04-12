@@ -1,10 +1,13 @@
-use std::{net::{IpAddr, Ipv4Addr, SocketAddr}, str::FromStr};
-use trust_dns_client::client::{Client, SyncClient};
-use trust_dns_client::udp::UdpClientConnection;
-use trust_dns_client::rr::{DNSClass, Name, RecordType, Record};
-use rand::thread_rng;
 use rand::seq::SliceRandom;
+use rand::thread_rng;
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    str::FromStr,
+};
 use tokio::sync::mpsc;
+use trust_dns_client::client::{Client, SyncClient};
+use trust_dns_client::rr::{DNSClass, Name, Record, RecordType};
+use trust_dns_client::udp::UdpClientConnection;
 
 pub const DNS_SERVERS: &'static [&'static str] = &[
     "8.8.8.8",
@@ -54,10 +57,10 @@ pub const DNS_SERVERS: &'static [&'static str] = &[
     "76.86.19.19",
     "76.223.122.150",
     "94.140.14.14",
-    "94.140.15.15"
+    "94.140.15.15",
 ];
 
-pub async fn try_query(domain_name: String, tx :mpsc::Sender<(String, Vec<Record>)>) {
+pub async fn try_query(domain_name: String, tx: mpsc::Sender<(String, Vec<Record>)>) {
     // Read URIs to query
     let name = Name::from_utf8(format!("_dmarc.{}", domain_name)).unwrap();
 
@@ -67,33 +70,39 @@ pub async fn try_query(domain_name: String, tx :mpsc::Sender<(String, Vec<Record
 
         // Open Udp connection for DNS client
         let conn = UdpClientConnection::with_timeout(
-            get_dns_ip().await, 
-            std::time::Duration::from_millis(200)
-        ).unwrap();
+            get_dns_ip().await,
+            std::time::Duration::from_millis(200),
+        )
+        .unwrap();
 
         // DNS client stuff
         let client = SyncClient::new(conn);
-       
+
         // Spawn blocking task and check for errors
         match tokio::task::spawn_blocking(move || {
             client.query(&name, DNSClass::IN, RecordType::TXT)
-        }).await.unwrap() {
+        })
+        .await
+        .unwrap()
+        {
             Ok(dns_response) => {
                 // Success to send domain name and DNS response to channel
-                let _ = tx.send((domain_name, dns_response.answers().to_owned())).await;
-                return
+                let _ = tx
+                    .send((domain_name, dns_response.answers().to_owned()))
+                    .await;
+                return;
             }
             Err(_e) => {
                 //eprintln!("Failed '{}'", e)
-            },
+            }
         }
     }
 }
 
 async fn get_dns_ip() -> SocketAddr {
-        // Choose random DNS server IP from DNS_SERVERS
-        let dns_server = DNS_SERVERS.choose(&mut thread_rng()).unwrap();
+    // Choose random DNS server IP from DNS_SERVERS
+    let dns_server = DNS_SERVERS.choose(&mut thread_rng()).unwrap();
 
-        // Conver to SockAddr
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::from_str(dns_server).unwrap()), 53)
+    // Conver to SockAddr
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::from_str(dns_server).unwrap()), 53)
 }
