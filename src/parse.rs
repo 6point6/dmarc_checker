@@ -114,8 +114,7 @@ impl Serialize for TagAction {
 
 impl TagAction {
     fn to_enum(p_tag_val: &str) -> Self {
-        match p_tag_val {
-            // Should this be case insensitive?
+        match p_tag_val.to_lowercase().as_str() {
             TAG_NONE => Self::None,
             TAG_QURANTINE => Self::Qurantine,
             TAG_REJECT => Self::Reject,
@@ -150,6 +149,7 @@ pub struct Dmarc {
     invalid: Option<String>,
     config_v: Option<String>,
     config_p: Option<String>,
+    config_pct: Option<String>,
     raw_data: String,
 }
 
@@ -169,6 +169,7 @@ impl Default for Dmarc {
             invalid: Default::default(),
             config_v: Default::default(),
             config_p: Default::default(),
+            config_pct: Default::default(),
             raw_data: Default::default(),
         }
     }
@@ -229,6 +230,7 @@ impl Dmarc {
             invalid: dmarc_parsed.invalid_entries,
             config_v: None,
             config_p: None,
+            config_pct: None,
             raw_data: dmarc_parsed.raw_txt,
         };
 
@@ -240,6 +242,7 @@ impl Dmarc {
     fn validate_config(&mut self) {
         self.config_v = Some(self.check_v().to_string());
         self.config_p = Some(self.check_p().to_string());
+        self.config_pct = Some(self.check_pct().to_string());
     }
 
     fn check_v(&self) -> DmarcFieldResult {
@@ -257,6 +260,28 @@ impl Dmarc {
             Some(v) => match v {
                 TagAction::Invalid(s) => DmarcFieldResult::Invalid(s.clone()),
                 _ => DmarcFieldResult::ValidConfig,
+            },
+            None => DmarcFieldResult::Empty,
+        }
+    }
+
+    fn check_pct(&self) -> DmarcFieldResult {
+        match &self.pct {
+            Some(p) => match &p.parse::<u8>() {
+                Ok(n) => {
+                    if *n < 25 {
+                        DmarcFieldResult::VeryBadConfig(p.clone())
+                    } else if *n < 100 {
+                        DmarcFieldResult::BadConfig(p.clone())
+                    } else if *n > 100 {
+                        DmarcFieldResult::Invalid(p.clone())
+                    } else {
+                        DmarcFieldResult::ValidConfig
+                    }
+                }
+                Err(_) => {
+                    DmarcFieldResult::Invalid(format!("{} <- {}", p, "Is not a number".to_string()))
+                }
             },
             None => DmarcFieldResult::Empty,
         }
@@ -321,6 +346,7 @@ impl<'a> DmarcParsed<'a> {
 enum DmarcFieldResult {
     ValidConfig,
     BadConfig(String),
+    VeryBadConfig(String),
     Invalid(String),
     Empty,
 }
@@ -330,6 +356,7 @@ impl ToString for DmarcFieldResult {
         match self {
             Self::ValidConfig => "Valid".to_string(),
             Self::BadConfig(s) => format!("Bad: {}", s),
+            Self::VeryBadConfig(s) => format!("Very bad: {}", s),
             Self::Invalid(s) => format!("Invalid: {}", s),
             Self::Empty => "Empty".to_string(),
         }
