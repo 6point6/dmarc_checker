@@ -259,6 +259,7 @@ impl Dmarc {
         match &self.p {
             Some(v) => match v {
                 TagAction::Invalid(s) => DmarcFieldResult::Invalid(s.clone()),
+                TagAction::None => DmarcFieldResult::VeryBadConfig(TAG_NONE.to_string()),
                 _ => DmarcFieldResult::ValidConfig,
             },
             None => DmarcFieldResult::Empty,
