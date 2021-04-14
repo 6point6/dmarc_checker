@@ -284,7 +284,7 @@ impl Dmarc {
                     DmarcFieldResult::Invalid(format!("{} <- {}", p, "Is not a number".to_string()))
                 }
             },
-            None => DmarcFieldResult::Empty,
+            None => DmarcFieldResult::ValidConfig,
         }
     }
 }
