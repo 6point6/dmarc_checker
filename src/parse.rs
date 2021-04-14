@@ -147,6 +147,7 @@ pub struct Dmarc {
     aspf: Option<String>,
     others: Option<String>,
     invalid: Option<String>,
+    config_v_p_order: Option<String>,
     config_v: Option<String>,
     config_p: Option<String>,
     config_pct: Option<String>,
@@ -167,6 +168,7 @@ impl Default for Dmarc {
             aspf: Default::default(),
             others: Default::default(),
             invalid: Default::default(),
+            config_v_p_order: Default::default(),
             config_v: Default::default(),
             config_p: Default::default(),
             config_pct: Default::default(),
@@ -195,6 +197,8 @@ impl Dmarc {
         }
 
         let mut dmarc_entries = dmarc_parsed.dmarc_entries.unwrap();
+
+        let config_v_p_order = Self::check_v_and_p_order(&dmarc_entries).to_string();
 
         let mut dmarc = Self {
             domain_name: domain_name.to_string(),
@@ -228,6 +232,7 @@ impl Dmarc {
                 }
             },
             invalid: dmarc_parsed.invalid_entries,
+            config_v_p_order: Some(config_v_p_order),
             config_v: None,
             config_p: None,
             config_pct: None,
@@ -286,6 +291,24 @@ impl Dmarc {
             },
             None => DmarcFieldResult::ValidConfig,
         }
+    }
+
+    fn check_v_and_p_order(dmarc_entries: &Vec<DmarcEntry>) -> DmarcFieldResult {
+        if dmarc_entries.len() < 2 {
+            return DmarcFieldResult::Invalid("V or P flag missing".to_string());
+        }
+
+        let (v, p) = (&dmarc_entries[0], &dmarc_entries[1]);
+
+        if v.tag != V_TAG {
+            return DmarcFieldResult::Invalid("First flag is not V".to_string());
+        }
+
+        if p.tag != P_TAG {
+            return DmarcFieldResult::Invalid("Second flag is not P".to_string());
+        }
+
+        DmarcFieldResult::ValidConfig
     }
 }
 
