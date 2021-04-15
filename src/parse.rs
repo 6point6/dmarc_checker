@@ -19,6 +19,8 @@ const TAG_QURANTINE: &str = "quarantine";
 const TAG_REJECT: &str = "reject";
 const TAG_INVALID: &str = "INVALID";
 
+const FLAG_NOT_PRESENT: &str = "Flag not present";
+
 #[derive(Debug, Deserialize)]
 pub struct DomainName(pub String);
 
@@ -258,7 +260,7 @@ impl Dmarc {
                 DmarcVersion::Dmarc1 => DmarcFieldResult::ValidConfig,
                 DmarcVersion::Invalid(s) => DmarcFieldResult::Invalid(s.clone()),
             },
-            None => DmarcFieldResult::Empty,
+            None => DmarcFieldResult::Invalid(FLAG_NOT_PRESENT.to_string()),
         }
     }
 
@@ -269,7 +271,7 @@ impl Dmarc {
                 TagAction::None => DmarcFieldResult::VeryBadConfig(TAG_NONE.to_string()),
                 _ => DmarcFieldResult::ValidConfig,
             },
-            None => DmarcFieldResult::Empty,
+            None => DmarcFieldResult::Invalid(FLAG_NOT_PRESENT.to_string()),
         }
     }
 
@@ -402,6 +404,34 @@ fn record_to_string(r: &Record) -> Option<String> {
             .and_then(|txt_data| Some(txt_data.to_string())),
         _ => None,
     }
+}
+
+#[test]
+fn check_v() {
+    let mut dmarc = Dmarc::default();
+
+    dmarc.v = None;
+    assert_eq!(
+        DmarcFieldResult::Invalid(FLAG_NOT_PRESENT.to_string()),
+        dmarc.check_v()
+    );
+
+    let invalid_ver = "smark";
+    dmarc.v = Some(DmarcVersion::Invalid(invalid_ver.to_string()));
+    assert_eq!(
+        DmarcFieldResult::Invalid(invalid_ver.to_string()),
+        dmarc.check_v()
+    );
+
+    let invalid_case = "dmarc1";
+    dmarc.v = Some(DmarcVersion::Invalid(invalid_case.to_string()));
+    assert_eq!(
+        DmarcFieldResult::Invalid(invalid_case.to_string()),
+        dmarc.check_v()
+    );
+
+    dmarc.v = Some(DmarcVersion::Dmarc1);
+    assert_eq!(DmarcFieldResult::ValidConfig, dmarc.check_v());
 }
 
 #[test]
