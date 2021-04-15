@@ -409,6 +409,8 @@ fn record_to_string(r: &Record) -> Option<String> {
     }
 }
 
+// Tests
+
 #[test]
 fn dmarc_check_v() {
     let mut dmarc = Dmarc::default();
@@ -437,6 +439,12 @@ fn dmarc_check_p() {
     dmarc.p = None;
     assert_eq!(
         DmarcFieldResult::Invalid(ERR_FLAG_NOT_PRESENT.to_string()),
+        dmarc.check_p()
+    );
+
+    dmarc.p = Some(TagAction::None);
+    assert_eq!(
+        DmarcFieldResult::VeryBadConfig(TAG_NONE.to_string()),
         dmarc.check_p()
     );
 
@@ -510,7 +518,6 @@ fn dmarc_check_v_and_p_order() {
         DmarcFieldResult::Invalid(ERR_SECOND_FLAG_NOT_P.to_string()),
     );
 
-    
     dmarc_entries[1] = DmarcEntry::new(P_TAG, TAG_NONE);
     assert_eq!(
         Dmarc::check_v_and_p_order(&dmarc_entries),
