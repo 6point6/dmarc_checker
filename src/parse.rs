@@ -19,7 +19,10 @@ const TAG_QURANTINE: &str = "quarantine";
 const TAG_REJECT: &str = "reject";
 const TAG_INVALID: &str = "INVALID";
 
-const FLAG_NOT_PRESENT: &str = "Flag not present";
+const ERR_FLAG_NOT_PRESENT: &str = "Flag not present";
+const ERR_MISSING_V_OR_P_FLAG: &str = "V or P flag missing";
+const ERR_FIRST_FLAG_NOT_V: &str = "First flag is not V";
+const ERR_SECOND_FLAG_NOT_P: &str = "Second flag is not P";
 
 #[derive(Debug, Deserialize)]
 pub struct DomainName(pub String);
@@ -260,7 +263,7 @@ impl Dmarc {
                 DmarcVersion::Dmarc1 => DmarcFieldResult::ValidConfig,
                 DmarcVersion::Invalid(s) => DmarcFieldResult::Invalid(s.clone()),
             },
-            None => DmarcFieldResult::Invalid(FLAG_NOT_PRESENT.to_string()),
+            None => DmarcFieldResult::Invalid(ERR_FLAG_NOT_PRESENT.to_string()),
         }
     }
 
@@ -271,7 +274,7 @@ impl Dmarc {
                 TagAction::None => DmarcFieldResult::VeryBadConfig(TAG_NONE.to_string()),
                 _ => DmarcFieldResult::ValidConfig,
             },
-            None => DmarcFieldResult::Invalid(FLAG_NOT_PRESENT.to_string()),
+            None => DmarcFieldResult::Invalid(ERR_FLAG_NOT_PRESENT.to_string()),
         }
     }
 
@@ -299,17 +302,17 @@ impl Dmarc {
 
     fn check_v_and_p_order(dmarc_entries: &Vec<DmarcEntry>) -> DmarcFieldResult {
         if dmarc_entries.len() < 2 {
-            return DmarcFieldResult::Invalid("V or P flag missing".to_string());
+            return DmarcFieldResult::Invalid(ERR_MISSING_V_OR_P_FLAG.to_string());
         }
 
         let (v, p) = (&dmarc_entries[0], &dmarc_entries[1]);
 
         if v.tag != V_TAG {
-            return DmarcFieldResult::Invalid("First flag is not V".to_string());
+            return DmarcFieldResult::Invalid(ERR_FIRST_FLAG_NOT_V.to_string());
         }
 
         if p.tag != P_TAG {
-            return DmarcFieldResult::Invalid("Second flag is not P".to_string());
+            return DmarcFieldResult::Invalid(ERR_SECOND_FLAG_NOT_P.to_string());
         }
 
         DmarcFieldResult::ValidConfig
@@ -412,7 +415,7 @@ fn dmarc_check_v() {
 
     dmarc.v = None;
     assert_eq!(
-        DmarcFieldResult::Invalid(FLAG_NOT_PRESENT.to_string()),
+        DmarcFieldResult::Invalid(ERR_FLAG_NOT_PRESENT.to_string()),
         dmarc.check_v()
     );
 
@@ -433,7 +436,7 @@ fn dmarc_check_p() {
 
     dmarc.p = None;
     assert_eq!(
-        DmarcFieldResult::Invalid(FLAG_NOT_PRESENT.to_string()),
+        DmarcFieldResult::Invalid(ERR_FLAG_NOT_PRESENT.to_string()),
         dmarc.check_p()
     );
 
@@ -477,5 +480,40 @@ fn dmarc_check_pct() {
     assert_eq!(
         DmarcFieldResult::Invalid(two_hundred_pct),
         dmarc.check_pct()
+    );
+}
+
+#[test]
+fn dmarc_check_v_and_p_order() {
+    let mut dmarc_entries: Vec<DmarcEntry> = Vec::new();
+
+    assert_eq!(
+        Dmarc::check_v_and_p_order(&dmarc_entries),
+        DmarcFieldResult::Invalid(ERR_MISSING_V_OR_P_FLAG.to_string()),
+    );
+
+    dmarc_entries.push(DmarcEntry::new("A", DMARC1));
+    assert_eq!(
+        Dmarc::check_v_and_p_order(&dmarc_entries),
+        DmarcFieldResult::Invalid(ERR_MISSING_V_OR_P_FLAG.to_string()),
+    );
+
+    dmarc_entries.push(DmarcEntry::new("B", TAG_NONE));
+    assert_eq!(
+        Dmarc::check_v_and_p_order(&dmarc_entries),
+        DmarcFieldResult::Invalid(ERR_FIRST_FLAG_NOT_V.to_string()),
+    );
+
+    dmarc_entries[0] = DmarcEntry::new(V_TAG, DMARC1);
+    assert_eq!(
+        Dmarc::check_v_and_p_order(&dmarc_entries),
+        DmarcFieldResult::Invalid(ERR_SECOND_FLAG_NOT_P.to_string()),
+    );
+
+    
+    dmarc_entries[1] = DmarcEntry::new(P_TAG, TAG_NONE);
+    assert_eq!(
+        Dmarc::check_v_and_p_order(&dmarc_entries),
+        DmarcFieldResult::ValidConfig,
     );
 }
