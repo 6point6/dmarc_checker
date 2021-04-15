@@ -407,7 +407,7 @@ fn record_to_string(r: &Record) -> Option<String> {
 }
 
 #[test]
-fn check_v() {
+fn dmarc_check_v() {
     let mut dmarc = Dmarc::default();
 
     dmarc.v = None;
@@ -423,19 +423,34 @@ fn check_v() {
         dmarc.check_v()
     );
 
-    let invalid_case = "dmarc1";
-    dmarc.v = Some(DmarcVersion::Invalid(invalid_case.to_string()));
-    assert_eq!(
-        DmarcFieldResult::Invalid(invalid_case.to_string()),
-        dmarc.check_v()
-    );
-
     dmarc.v = Some(DmarcVersion::Dmarc1);
     assert_eq!(DmarcFieldResult::ValidConfig, dmarc.check_v());
 }
 
 #[test]
-fn check_pct() {
+fn dmarc_check_p() {
+    let mut dmarc = Dmarc::default();
+
+    dmarc.p = None;
+    assert_eq!(
+        DmarcFieldResult::Invalid(FLAG_NOT_PRESENT.to_string()),
+        dmarc.check_p()
+    );
+
+    /*
+    match &self.p {
+        Some(v) => match v {
+            TagAction::Invalid(s) => DmarcFieldResult::Invalid(s.clone()),
+            TagAction::None => DmarcFieldResult::VeryBadConfig(TAG_NONE.to_string()),
+            _ => DmarcFieldResult::ValidConfig,
+        },
+        None => DmarcFieldResult::Invalid(FLAG_NOT_PRESENT.to_string()),
+    }
+    */
+}
+
+#[test]
+fn dmarc_check_pct() {
     let mut dmarc = Dmarc::default();
 
     dmarc.pct = None;
