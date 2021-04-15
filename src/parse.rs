@@ -56,7 +56,7 @@ impl StringRecords {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum DmarcVersion {
     Dmarc1,
     Invalid(String),
@@ -410,6 +410,20 @@ fn record_to_string(r: &Record) -> Option<String> {
 }
 
 // Tests
+#[test]
+fn dmarc_version_to_ver() {
+    assert_eq!(
+        DmarcVersion::Invalid("blah".to_string()),
+        DmarcVersion::to_ver("blah")
+    );
+
+    assert_eq!(
+        DmarcVersion::Invalid("dmarc1".to_string()),
+        DmarcVersion::to_ver("dmarc1")
+    );
+
+    assert_eq!(DmarcVersion::Dmarc1, DmarcVersion::to_ver(DMARC1));
+}
 
 #[test]
 fn dmarc_check_v() {
