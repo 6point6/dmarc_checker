@@ -16,3 +16,6 @@ clap = "2.33.3"
 serde = { version = "1.0", features = ["derive"] }
 env_logger = "0.7.1"
 csv-async = { version = "1.2.0", features = ["tokio"] }
+
+[dev-dependencies]
+pretty_assertions = "0.7.1"

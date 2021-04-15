@@ -1,3 +1,5 @@
+#[cfg(test)]
+use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize, Serializer};
 use trust_dns_client::rr::{Record, RecordType};
 
@@ -367,7 +369,8 @@ impl<'a> DmarcParsed<'a> {
     }
 }
 
-enum DmarcFieldResult {
+#[derive(Debug, PartialEq)]
+pub enum DmarcFieldResult {
     ValidConfig,
     BadConfig(String),
     VeryBadConfig(String),
@@ -399,4 +402,35 @@ fn record_to_string(r: &Record) -> Option<String> {
             .and_then(|txt_data| Some(txt_data.to_string())),
         _ => None,
     }
+}
+
+#[test]
+fn check_pct() {
+    let mut dmarc = Dmarc::default();
+
+    dmarc.pct = None;
+    assert_eq!(DmarcFieldResult::ValidConfig, dmarc.check_pct());
+
+    let zero_pct = "0".to_string();
+    let twenty_six_pct = "26".to_string();
+    let one_hundred_pct = "100".to_string();
+    let two_hundred_pct = "200".to_string();
+
+    dmarc.pct = Some(zero_pct.clone());
+    assert_eq!(DmarcFieldResult::VeryBadConfig(zero_pct), dmarc.check_pct());
+
+    dmarc.pct = Some(twenty_six_pct.clone());
+    assert_eq!(
+        DmarcFieldResult::BadConfig(twenty_six_pct),
+        dmarc.check_pct()
+    );
+
+    dmarc.pct = Some(one_hundred_pct.clone());
+    assert_eq!(DmarcFieldResult::ValidConfig, dmarc.check_pct());
+
+    dmarc.pct = Some(two_hundred_pct.clone());
+    assert_eq!(
+        DmarcFieldResult::Invalid(two_hundred_pct),
+        dmarc.check_pct()
+    );
 }
