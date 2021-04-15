@@ -448,16 +448,11 @@ fn dmarc_check_p() {
         dmarc.check_p()
     );
 
-    /*
-    match &self.p {
-        Some(v) => match v {
-            TagAction::Invalid(s) => DmarcFieldResult::Invalid(s.clone()),
-            TagAction::None => DmarcFieldResult::VeryBadConfig(TAG_NONE.to_string()),
-            _ => DmarcFieldResult::ValidConfig,
-        },
-        None => DmarcFieldResult::Invalid(FLAG_NOT_PRESENT.to_string()),
-    }
-    */
+    dmarc.p = Some(TagAction::Qurantine);
+    assert_eq!(DmarcFieldResult::ValidConfig, dmarc.check_p());
+
+    dmarc.p = Some(TagAction::Reject);
+    assert_eq!(DmarcFieldResult::ValidConfig, dmarc.check_p());
 }
 
 #[test]
