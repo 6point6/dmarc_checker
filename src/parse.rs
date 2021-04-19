@@ -130,7 +130,7 @@ impl TagAction {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct DmarcEntry<'a> {
     tag: &'a str,
     val: &'a str,
@@ -319,7 +319,7 @@ impl Dmarc {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct DmarcParsed<'a> {
     dmarc_entries: Option<Vec<DmarcEntry<'a>>>,
     invalid_entries: Option<String>,
@@ -342,15 +342,17 @@ impl<'a> DmarcParsed<'a> {
         let mut invalid_entries = String::new();
         let entry_iter = txt.split(';');
 
-        for e in entry_iter {
-            match e.find('=') {
-                Some(idx) => dmarc_entries.push(DmarcEntry::new(
-                    &e[0..idx].trim(),
-                    &e[idx + 1..e.len()].trim(),
-                )),
-                None => {
-                    if !e.is_empty() {
-                        invalid_entries.push_str(e)
+        if entry_iter.clone().count() > 1 {
+            for e in entry_iter {
+                match e.find('=') {
+                    Some(idx) => dmarc_entries.push(DmarcEntry::new(
+                        &e[0..idx].trim(),
+                        &e[idx + 1..e.len()].trim(),
+                    )),
+                    None => {
+                        if !e.is_empty() {
+                            invalid_entries.push_str(e)
+                        }
                     }
                 }
             }
@@ -407,6 +409,52 @@ fn record_to_string(r: &Record) -> Option<String> {
             .and_then(|txt_data| Some(txt_data.to_string())),
         _ => None,
     }
+}
+
+#[test]
+fn dmarc_parsed_new() {
+    assert_eq!(
+        DmarcParsed::new(&"".to_string()),
+        DmarcParsed {
+            dmarc_entries: None,
+            invalid_entries: None,
+            raw_txt: "\"\"".to_string()
+        }
+    );
+
+    let invalid_entry = format!("{}={} {}={}", V_TAG, DMARC1, P_TAG, TAG_NONE);
+    assert_eq!(
+        DmarcParsed::new(&invalid_entry),
+        DmarcParsed {
+            dmarc_entries: None,
+            invalid_entries: None,
+            raw_txt: format!("\"{}\"", invalid_entry),
+        }
+    );
+
+    let invalid_tag = "p%fsa";
+    let invalid_entry = format!("{}={};{};", V_TAG, DMARC1, invalid_tag);
+    assert_eq!(
+        DmarcParsed::new(&invalid_entry),
+        DmarcParsed {
+            dmarc_entries: Some(vec![DmarcEntry::new(V_TAG, DMARC1)]),
+            invalid_entries: Some(invalid_tag.to_string()),
+            raw_txt: format!("\"{}\"", invalid_entry),
+        }
+    );
+
+    let valid_entry = format!("{}={}; {}={};", V_TAG, DMARC1, P_TAG, TAG_NONE);
+    assert_eq!(
+        DmarcParsed::new(&valid_entry),
+        DmarcParsed {
+            dmarc_entries: Some(vec![
+                DmarcEntry::new(V_TAG, DMARC1),
+                DmarcEntry::new(P_TAG, TAG_NONE)
+            ]),
+            invalid_entries: None,
+            raw_txt: format!("\"{}\"", valid_entry),
+        }
+    );
 }
 
 // Tests
