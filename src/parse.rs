@@ -95,7 +95,7 @@ fn match_tag<'a>(tag: &str, dmarc_entries: &'a mut Vec<DmarcEntry>) -> Option<Dm
     return None;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum TagAction {
     None,
     Qurantine,
@@ -580,4 +580,17 @@ fn dmarc_check_v_and_p_order() {
         Dmarc::check_v_and_p_order(&dmarc_entries),
         DmarcFieldResult::ValidConfig,
     );
+}
+
+#[test]
+fn tag_action_to_enum() {
+    let invalid_tag = "Destroy";
+    assert_eq!(
+        TagAction::to_enum(invalid_tag),
+        TagAction::Invalid(invalid_tag.to_string())
+    );
+
+    assert_eq!(TagAction::to_enum(TAG_NONE), TagAction::None);
+    assert_eq!(TagAction::to_enum(TAG_QURANTINE), TagAction::Qurantine);
+    assert_eq!(TagAction::to_enum(TAG_REJECT), TagAction::Reject);
 }
