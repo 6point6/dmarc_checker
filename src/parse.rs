@@ -141,7 +141,7 @@ impl<'a> DmarcEntry<'a> {
         Self { tag, val }
     }
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Dmarc {
     domain_name: String,
     v: Option<DmarcVersion>,
@@ -195,15 +195,16 @@ impl Dmarc {
             }
         };
 
-        if dmarc_parsed.dmarc_entries.is_none() {
-            let mut res = Self::default();
-            res.domain_name = domain_name.to_string();
-            res.invalid = dmarc_parsed.invalid_entries;
-            res.raw_data = dmarc_parsed.raw_txt;
-            return res;
-        }
-
-        let mut dmarc_entries = dmarc_parsed.dmarc_entries.unwrap();
+        let mut dmarc_entries = match dmarc_parsed.dmarc_entries {
+            Some(de) => de,
+            None => {
+                let mut res = Self::default();
+                res.domain_name = domain_name.to_string();
+                res.invalid = dmarc_parsed.invalid_entries;
+                res.raw_data = dmarc_parsed.raw_txt;
+                return res;
+            }
+        };
 
         let config_v_p_order = Self::check_v_and_p_order(&dmarc_entries).to_string();
 
@@ -593,4 +594,27 @@ fn tag_action_to_enum() {
     assert_eq!(TagAction::to_enum(TAG_NONE), TagAction::None);
     assert_eq!(TagAction::to_enum(TAG_QURANTINE), TagAction::Qurantine);
     assert_eq!(TagAction::to_enum(TAG_REJECT), TagAction::Reject);
+}
+
+#[test]
+fn dmarc_new() {
+    let test_domain = "google.com";
+    let valid = "Valid";
+
+    let dmarc = Dmarc::new(test_domain, None);
+    let mut dmarc_compare = Dmarc::default();
+
+    dmarc_compare.domain_name = test_domain.to_string();
+    assert_eq!(dmarc, dmarc_compare);
+
+    let valid_entry = format!("{}={}; {}={};", V_TAG, DMARC1, P_TAG, TAG_NONE);
+    let dmarc = Dmarc::new(test_domain, Some(valid_entry.clone()));
+    dmarc_compare.v = Some(DmarcVersion::Dmarc1);
+    dmarc_compare.p = Some(TagAction::None);
+    dmarc_compare.config_v_p_order = Some(valid.to_string());
+    dmarc_compare.config_v = Some(dmarc.check_v().to_string());
+    dmarc_compare.config_p = Some(dmarc.check_p().to_string());
+    dmarc_compare.config_pct = Some(dmarc.check_pct().to_string());
+    dmarc_compare.raw_data = format!("\"{}\"", valid_entry);
+    assert_eq!(dmarc, dmarc_compare);
 }
