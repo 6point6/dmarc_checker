@@ -168,6 +168,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e25ea47919b1560c4e3b7fe0aaab9becf5b84a10325ddf7db0f0ba5e1026499"
 
 [[package]]
+name = "dmarc_checker"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "csv-async",
+ "env_logger",
+ "futures",
+ "pretty_assertions",
+ "rand",
+ "serde",
+ "tokio",
+ "trust-dns-client",
+ "trust-dns-proto",
+]
+
+[[package]]
 name = "endian-type"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -432,22 +448,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
 dependencies = [
  "winapi",
-]
-
-[[package]]
-name = "multit"
-version = "0.1.0"
-dependencies = [
- "clap",
- "csv-async",
- "env_logger",
- "futures",
- "pretty_assertions",
- "rand",
- "serde",
- "tokio",
- "trust-dns-client",
- "trust-dns-proto",
 ]
 
 [[package]]
