@@ -19,6 +19,9 @@ const TAG_QURANTINE: &str = "quarantine";
 const TAG_REJECT: &str = "reject";
 const TAG_INVALID: &str = "INVALID";
 
+const YES: &str = "Yes";
+const NO: &str = "No";
+
 const ERR_FLAG_NOT_PRESENT: &str = "Flag not present";
 const ERR_MISSING_V_OR_P_FLAG: &str = "V or P flag missing";
 const ERR_FIRST_FLAG_NOT_V: &str = "First flag is not V";
@@ -144,6 +147,7 @@ impl<'a> DmarcEntry<'a> {
 #[derive(Debug, Default, PartialEq, Serialize)]
 pub struct Dmarc {
     domain_name: String,
+    empty_record: String,
     v: Option<DmarcVersion>,
     p: Option<TagAction>,
     pct: Option<String>, // TODO: Should change this to a u8 later
@@ -153,7 +157,7 @@ pub struct Dmarc {
     adkim: Option<String>,
     aspf: Option<String>,
     others: Option<String>,
-    invalid: Option<String>,
+    invalid_flags: Option<String>,
     config_v_p_order: Option<String>,
     config_v: Option<String>,
     config_p: Option<String>,
@@ -168,6 +172,7 @@ impl Dmarc {
             None => {
                 let mut res = Self::default();
                 res.domain_name = domain_name.to_string();
+                res.empty_record = YES.to_string();
                 return res;
             }
         };
@@ -177,7 +182,8 @@ impl Dmarc {
             None => {
                 let mut res = Self::default();
                 res.domain_name = domain_name.to_string();
-                res.invalid = dmarc_parsed.invalid_entries;
+                res.invalid_flags = dmarc_parsed.invalid_entries;
+                res.empty_record = NO.to_string();
                 res.raw_data = dmarc_parsed.raw_txt;
                 return res;
             }
@@ -187,6 +193,7 @@ impl Dmarc {
 
         let mut dmarc = Self {
             domain_name: domain_name.to_string(),
+            empty_record: NO.to_string(),
             v: match_tag(V_TAG, &mut dmarc_entries)
                 .and_then(|v_entry| Some(DmarcVersion::to_ver(v_entry.val))),
             p: match_tag(P_TAG, &mut dmarc_entries)
@@ -216,7 +223,7 @@ impl Dmarc {
                     }
                 }
             },
-            invalid: dmarc_parsed.invalid_entries,
+            invalid_flags: dmarc_parsed.invalid_entries,
             config_v_p_order: Some(config_v_p_order),
             config_v: None,
             config_p: None,
@@ -582,10 +589,12 @@ fn dmarc_new() {
     let mut dmarc_compare = Dmarc::default();
 
     dmarc_compare.domain_name = test_domain.to_string();
+    dmarc_compare.empty_record = YES.to_string();
     assert_eq!(dmarc, dmarc_compare);
 
     let valid_entry = format!("{}={}; {}={};", V_TAG, DMARC1, P_TAG, TAG_NONE);
     let dmarc = Dmarc::new(test_domain, Some(valid_entry.clone()));
+    dmarc_compare.empty_record = NO.to_string();
     dmarc_compare.v = Some(DmarcVersion::Dmarc1);
     dmarc_compare.p = Some(TagAction::None);
     dmarc_compare.config_v_p_order = Some(valid.to_string());
