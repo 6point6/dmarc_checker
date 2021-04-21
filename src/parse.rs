@@ -141,7 +141,7 @@ impl<'a> DmarcEntry<'a> {
         Self { tag, val }
     }
 }
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, Default, PartialEq, Serialize)]
 pub struct Dmarc {
     domain_name: String,
     v: Option<DmarcVersion>,
@@ -159,29 +159,6 @@ pub struct Dmarc {
     config_p: Option<String>,
     config_pct: Option<String>,
     raw_data: String,
-}
-
-impl Default for Dmarc {
-    fn default() -> Self {
-        Self {
-            domain_name: Default::default(),
-            v: Default::default(),
-            p: Default::default(),
-            pct: Default::default(),
-            rua: Default::default(),
-            ruf: Default::default(),
-            sp: Default::default(),
-            adkim: Default::default(),
-            aspf: Default::default(),
-            others: Default::default(),
-            invalid: Default::default(),
-            config_v_p_order: Default::default(),
-            config_v: Default::default(),
-            config_p: Default::default(),
-            config_pct: Default::default(),
-            raw_data: Default::default(),
-        }
-    }
 }
 
 impl Dmarc {
