@@ -11,30 +11,6 @@ mod utils;
 #[tokio::main]
 async fn main() -> Result<(), ()> {
     let config = utils::Config::new();
-    let (tx, rx) = mpsc::channel(query::DNS_SERVERS.len());
-
-    // Loop through domains in file provider by user
-    for domain_name in std::fs::read_to_string(&config.input_domain_file)
-        .map_err(|e| {
-            print_err!(
-                "Failed to read file: {}
-        - {}",
-                config.input_domain_file,
-                e
-            )
-        })?
-        .lines()
-    {
-        // Convert domain name to string for tokio task
-        let domain_name = domain_name.to_string();
-
-        // Clone Sender tx for task move
-        let tx = tx.clone();
-
-        tokio::spawn(async move { query::try_query(domain_name, tx).await });
-    }
-    // Close original Sender tx to prevent a dead lock
-    drop(tx);
 
     // Open asynchronous file writers and serializers
     let output_dmarc_file = File::create(&config.output_dmarc_file).await.map_err(|e| {
@@ -46,16 +22,48 @@ async fn main() -> Result<(), ()> {
     })?;
 
     let mut output_dmarc_filewriter = csv_async::AsyncSerializer::from_writer(output_dmarc_file);
-
-    // Write output to csv file
-    output_dmarc_filewriter = write_dmarc_output_to_csv(output_dmarc_filewriter, rx)
-        .await
+    
+    // Read all domains for batching
+    let domain_names = std::fs::read_to_string(&config.input_domain_file)
         .map_err(|e| {
-            eprintln!(
-                "Failed to write output to file: {} - {}",
-                config.input_domain_file, e
+            print_err!(
+                "Failed to read file: {}
+        - {}",
+                config.input_domain_file,
+                e
             )
         })?;
+    
+    // Batch into iter chunks of batch_size
+    for domain_chunk in domain_names
+        .lines()
+        .collect::<Vec<&str>>()
+        .chunks(config.batch_size) {
+
+        let (tx, rx) = mpsc::channel(query::DNS_SERVERS.len());
+
+        for domain_name in domain_chunk {
+            
+            // Convert domain name to string for tokio task
+            let domain_name = domain_name.to_string();
+
+            // Clone Sender tx for task move
+            let tx = tx.clone();
+
+            tokio::spawn(async move { query::try_query(domain_name, tx).await });
+        }
+        // Close original Sender tx to prevent a dead lock
+        drop(tx);
+        
+        // Write output to csv file
+        output_dmarc_filewriter = write_dmarc_output_to_csv(output_dmarc_filewriter, rx)
+            .await
+            .map_err(|e| { 
+                eprintln!(
+                    "Failed to write output to file: {} - {}",
+                    config.input_domain_file, e
+                )})?;
+    }
 
     // Flush filewriter buffers
     output_dmarc_filewriter

@@ -1,8 +1,11 @@
 use clap::{App, Arg};
 
+static DEFAULT_BATCH_SIZE: usize = 50000;
+
 pub struct Config {
     pub input_domain_file: String,
     pub output_dmarc_file: String,
+    pub batch_size: usize,
 }
 
 impl Config {
@@ -28,11 +31,40 @@ impl Config {
                     .required(true)
                     .takes_value(true),
             )
+            .arg(
+                Arg::with_name("batch_size")
+                    .short("b")
+                    .long("batch_size")
+                    .value_name("BATCH_SIZE")
+                    .help("batch size of domains to process")
+                    .required(false)
+                    .takes_value(true),
+            )
             .get_matches();
+       
+        // If batch size exists set it to CLI argument, otherwise set it to default
+        let batch_size = if args.occurrences_of("batch_size") > 0 {
+            // Attempt to extract valid u32 from string CLI value
+            match args.value_of("batch_size")
+                    .unwrap()
+                    .parse::<usize>() {
+                        Ok(num) => num,
+                        Err(e) => {
+                            eprintln!("Cannot parse provided batch size '{}'\r\nUsing default!", e);
+                            DEFAULT_BATCH_SIZE
+                        }
+                    }
+        // Default condition
+        } else {
+            DEFAULT_BATCH_SIZE
+        };
+
+        eprintln!("Using batch size of {}", batch_size);
 
         Self {
             input_domain_file: String::from(args.value_of("input_domain_file").unwrap()),
             output_dmarc_file: String::from(args.value_of("output_dmarc_file").unwrap()),
+            batch_size
         }
     }
 }
