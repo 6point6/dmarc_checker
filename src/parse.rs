@@ -27,6 +27,12 @@ const ERR_MISSING_V_OR_P_FLAG: &str = "V or P flag missing";
 const ERR_FIRST_FLAG_NOT_V: &str = "First flag is not V";
 const ERR_SECOND_FLAG_NOT_P: &str = "Second flag is not P";
 
+const ERR_P_FLAG_MISSING_AND_SP_NOT_SET: &str = "Missing p flag and sp not set";
+const ERR_P_FLAG_MISSING: &str = "P flag missing";
+const ERR_IGNORE_SUBDOMAIN_DMARC_FAILS: &str = "sp=none: Ignores subdomain DMARC fails";
+const ERR_PERMITS_SUBDOMAIN_SPOOFING: &str =
+    "p=reject, sp=none: Ignores subdomain DMARC fails and permits subdomain spoofing";
+
 #[derive(Debug, Deserialize)]
 pub struct DomainName(pub String);
 
@@ -162,6 +168,7 @@ pub struct Dmarc {
     config_v: Option<String>,
     config_p: Option<String>,
     config_pct: Option<String>,
+    config_sp: Option<String>,
     raw_data: String,
 }
 
@@ -228,6 +235,7 @@ impl Dmarc {
             config_v: None,
             config_p: None,
             config_pct: None,
+            config_sp: None,
             raw_data: dmarc_parsed.raw_txt,
         };
 
@@ -240,6 +248,7 @@ impl Dmarc {
         self.config_v = Some(self.check_v().to_string());
         self.config_p = Some(self.check_p().to_string());
         self.config_pct = Some(self.check_pct().to_string());
+        self.config_sp = Some(self.check_sp().to_string());
     }
 
     fn check_v(&self) -> DmarcFieldResult {
@@ -301,6 +310,31 @@ impl Dmarc {
         }
 
         DmarcFieldResult::ValidConfig
+    }
+
+    fn check_sp(&self) -> DmarcFieldResult {
+        let sp = match &self.sp {
+            Some(sp) => sp,
+            None => match &self.p {
+                Some(p) => p,
+                None => {
+                    return DmarcFieldResult::Invalid(ERR_P_FLAG_MISSING_AND_SP_NOT_SET.to_string())
+                }
+            },
+        };
+
+        match sp {
+            TagAction::None => match &self.p {
+                Some(p) => match p {
+                    TagAction::Reject => {
+                        DmarcFieldResult::VeryBadConfig(ERR_PERMITS_SUBDOMAIN_SPOOFING.to_string())
+                    }
+                    _ => DmarcFieldResult::BadConfig(ERR_IGNORE_SUBDOMAIN_DMARC_FAILS.to_string()),
+                },
+                None => DmarcFieldResult::Invalid(ERR_P_FLAG_MISSING.to_string()),
+            },
+            _ => DmarcFieldResult::ValidConfig,
+        }
     }
 }
 
@@ -531,6 +565,13 @@ fn dmarc_check_pct() {
         DmarcFieldResult::Invalid(two_hundred_pct),
         dmarc.check_pct()
     );
+}
+
+#[test]
+fn dmarc_check_sp() {
+    let mut dmarc = Dmarc::default();
+
+    dmarc.sp = Some(TagAction::None);
 }
 
 #[test]
