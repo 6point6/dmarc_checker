@@ -224,6 +224,7 @@ impl Dmarc {
                         DmarcParsed::new(txt)
                     }
                     None => {
+                        dmarc.record_type = TXT_RECORD.to_string();
                         dmarc.returned_record = YES.to_string();
                         return dmarc;
                     }
@@ -654,7 +655,6 @@ fn tag_action_to_enum() {
     assert_eq!(TagAction::to_enum(TAG_REJECT), TagAction::Reject);
 }
 
-/*
 #[test]
 fn dmarc_new() {
     let test_domain = "google.com";
@@ -664,19 +664,50 @@ fn dmarc_new() {
     let mut dmarc_compare = Dmarc::default();
 
     dmarc_compare.domain_name = test_domain.to_string();
-    dmarc_compare.returned_record = YES.to_string();
+    dmarc_compare.returned_record = NO.to_string();
     assert_eq!(dmarc, dmarc_compare);
 
-    let valid_entry = format!("{}={}; {}={};", V_TAG, DMARC1, P_TAG, TAG_NONE);
-    let dmarc = Dmarc::new(test_domain, Some(valid_entry.clone()));
-    dmarc_compare.returned_record = NO.to_string();
+    let raw_cname = "microsoft.com".to_string();
+    let cname_record = DmarcRecordType::Cname(Some(raw_cname.clone()));
+    let dmarc = Dmarc::new(test_domain, Some(cname_record));
+    dmarc_compare.returned_record = YES.to_string();
+    dmarc_compare.record_type = CNAME_RECORD.to_string();
+    dmarc_compare.raw_data = raw_cname.clone();
+    assert_eq!(dmarc, dmarc_compare);
+
+    let cname_record = DmarcRecordType::Cname(None);
+    let dmarc = Dmarc::new(test_domain, Some(cname_record));
+    dmarc_compare.returned_record = YES.to_string();
+    dmarc_compare.record_type = CNAME_RECORD.to_string();
+    dmarc_compare.raw_data = "".to_string();
+    assert_eq!(dmarc, dmarc_compare);
+
+    let txt_record = DmarcRecordType::Txt(None);
+    let dmarc = Dmarc::new(test_domain, Some(txt_record));
+    dmarc_compare.returned_record = YES.to_string();
+    dmarc_compare.record_type = TXT_RECORD.to_string();
+    dmarc_compare.raw_data = "".to_string();
+    assert_eq!(dmarc, dmarc_compare);
+
+    let txt_record = DmarcRecordType::Other;
+    let dmarc = Dmarc::new(test_domain, Some(txt_record));
+    dmarc_compare.returned_record = YES.to_string();
+    dmarc_compare.record_type = OTHER_RECORD.to_string();
+    dmarc_compare.raw_data = "".to_string();
+    assert_eq!(dmarc, dmarc_compare);
+
+    let raw_txt = format!("{}={}; {}={};", V_TAG, DMARC1, P_TAG, TAG_NONE);
+    let txt_record = DmarcRecordType::Txt(Some(raw_txt.clone()));
+    let dmarc = Dmarc::new(test_domain, Some(txt_record));
+    dmarc_compare.returned_record = YES.to_string();
+    dmarc_compare.record_type = TXT_RECORD.to_string();
     dmarc_compare.v = Some(DmarcVersion::Dmarc1);
     dmarc_compare.p = Some(TagAction::None);
     dmarc_compare.config_v_p_order = Some(valid.to_string());
     dmarc_compare.config_v = Some(dmarc.check_v().to_string());
     dmarc_compare.config_p = Some(dmarc.check_p().to_string());
     dmarc_compare.config_pct = Some(dmarc.check_pct().to_string());
-    dmarc_compare.raw_data = format!("\"{}\"", valid_entry);
+    dmarc_compare.config_sp = Some(dmarc.check_sp().to_string());
+    dmarc_compare.raw_data = format!("\"{}\"", raw_txt);
     assert_eq!(dmarc, dmarc_compare);
 }
-*/
