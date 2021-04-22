@@ -303,20 +303,20 @@ impl Dmarc {
         match &self.v {
             Some(ver) => match ver {
                 DmarcVersion::Dmarc1 => DmarcFieldResult::ValidConfig,
-                DmarcVersion::Invalid(s) => DmarcFieldResult::Invalid(s.clone()),
+                DmarcVersion::Invalid(s) => DmarcFieldResult::InvalidConfig(s.clone()),
             },
-            None => DmarcFieldResult::Invalid(ERR_FLAG_NOT_PRESENT.to_string()),
+            None => DmarcFieldResult::InvalidConfig(ERR_FLAG_NOT_PRESENT.to_string()),
         }
     }
 
     fn check_p(&self) -> DmarcFieldResult {
         match &self.p {
             Some(v) => match v {
-                TagAction::Invalid(s) => DmarcFieldResult::Invalid(s.clone()),
+                TagAction::Invalid(s) => DmarcFieldResult::InvalidConfig(s.clone()),
                 TagAction::None => DmarcFieldResult::VeryBadConfig(TAG_NONE.to_string()),
                 _ => DmarcFieldResult::ValidConfig,
             },
-            None => DmarcFieldResult::Invalid(ERR_FLAG_NOT_PRESENT.to_string()),
+            None => DmarcFieldResult::InvalidConfig(ERR_FLAG_NOT_PRESENT.to_string()),
         }
     }
 
@@ -329,14 +329,16 @@ impl Dmarc {
                     } else if *n < 100 {
                         DmarcFieldResult::BadConfig(p.clone())
                     } else if *n > 100 {
-                        DmarcFieldResult::Invalid(p.clone())
+                        DmarcFieldResult::InvalidConfig(p.clone())
                     } else {
                         DmarcFieldResult::ValidConfig
                     }
                 }
-                Err(_) => {
-                    DmarcFieldResult::Invalid(format!("{} <- {}", p, "Is not a number".to_string()))
-                }
+                Err(_) => DmarcFieldResult::InvalidConfig(format!(
+                    "{} <- {}",
+                    p,
+                    "Is not a number".to_string()
+                )),
             },
             None => DmarcFieldResult::ValidConfig,
         }
@@ -344,17 +346,17 @@ impl Dmarc {
 
     fn check_v_and_p_order(dmarc_entries: &Vec<DmarcEntry>) -> DmarcFieldResult {
         if dmarc_entries.len() < 2 {
-            return DmarcFieldResult::Invalid(ERR_MISSING_V_OR_P_FLAG.to_string());
+            return DmarcFieldResult::InvalidConfig(ERR_MISSING_V_OR_P_FLAG.to_string());
         }
 
         let (v, p) = (&dmarc_entries[0], &dmarc_entries[1]);
 
         if v.tag != V_TAG {
-            return DmarcFieldResult::Invalid(ERR_FIRST_FLAG_NOT_V.to_string());
+            return DmarcFieldResult::InvalidConfig(ERR_FIRST_FLAG_NOT_V.to_string());
         }
 
         if p.tag != P_TAG {
-            return DmarcFieldResult::Invalid(ERR_SECOND_FLAG_NOT_P.to_string());
+            return DmarcFieldResult::InvalidConfig(ERR_SECOND_FLAG_NOT_P.to_string());
         }
 
         DmarcFieldResult::ValidConfig
@@ -366,7 +368,9 @@ impl Dmarc {
             None => match &self.p {
                 Some(p) => p,
                 None => {
-                    return DmarcFieldResult::Invalid(ERR_P_FLAG_MISSING_AND_SP_NOT_SET.to_string())
+                    return DmarcFieldResult::InvalidConfig(
+                        ERR_P_FLAG_MISSING_AND_SP_NOT_SET.to_string(),
+                    )
                 }
             },
         };
@@ -379,7 +383,7 @@ impl Dmarc {
                     }
                     _ => DmarcFieldResult::BadConfig(ERR_IGNORE_SUBDOMAIN_DMARC_FAILS.to_string()),
                 },
-                None => DmarcFieldResult::Invalid(ERR_P_FLAG_MISSING.to_string()),
+                None => DmarcFieldResult::InvalidConfig(ERR_P_FLAG_MISSING.to_string()),
             },
             _ => DmarcFieldResult::ValidConfig,
         }
@@ -448,7 +452,7 @@ pub enum DmarcFieldResult {
     ValidConfig,
     BadConfig(String),
     VeryBadConfig(String),
-    Invalid(String),
+    InvalidConfig(String),
     Empty,
 }
 
@@ -458,7 +462,7 @@ impl ToString for DmarcFieldResult {
             Self::ValidConfig => "Valid".to_string(),
             Self::BadConfig(s) => format!("Bad: {}", s),
             Self::VeryBadConfig(s) => format!("Very bad: {}", s),
-            Self::Invalid(s) => format!("Invalid: {}", s),
+            Self::InvalidConfig(s) => format!("Invalid: {}", s),
             Self::Empty => "Empty".to_string(),
         }
     }
@@ -532,14 +536,14 @@ fn dmarc_check_v() {
 
     dmarc.v = None;
     assert_eq!(
-        DmarcFieldResult::Invalid(ERR_FLAG_NOT_PRESENT.to_string()),
+        DmarcFieldResult::InvalidConfig(ERR_FLAG_NOT_PRESENT.to_string()),
         dmarc.check_v()
     );
 
     let invalid_ver = "smark";
     dmarc.v = Some(DmarcVersion::Invalid(invalid_ver.to_string()));
     assert_eq!(
-        DmarcFieldResult::Invalid(invalid_ver.to_string()),
+        DmarcFieldResult::InvalidConfig(invalid_ver.to_string()),
         dmarc.check_v()
     );
 
@@ -553,7 +557,7 @@ fn dmarc_check_p() {
 
     dmarc.p = None;
     assert_eq!(
-        DmarcFieldResult::Invalid(ERR_FLAG_NOT_PRESENT.to_string()),
+        DmarcFieldResult::InvalidConfig(ERR_FLAG_NOT_PRESENT.to_string()),
         dmarc.check_p()
     );
 
@@ -596,7 +600,7 @@ fn dmarc_check_pct() {
 
     dmarc.pct = Some(two_hundred_pct.clone());
     assert_eq!(
-        DmarcFieldResult::Invalid(two_hundred_pct),
+        DmarcFieldResult::InvalidConfig(two_hundred_pct),
         dmarc.check_pct()
     );
 }
@@ -605,7 +609,42 @@ fn dmarc_check_pct() {
 fn dmarc_check_sp() {
     let mut dmarc = Dmarc::default();
 
+    dmarc.p = None;
+    dmarc.sp = None;
+    assert_eq!(
+        DmarcFieldResult::InvalidConfig(ERR_P_FLAG_MISSING_AND_SP_NOT_SET.to_string()),
+        dmarc.check_sp()
+    );
+
     dmarc.sp = Some(TagAction::None);
+    assert_eq!(
+        DmarcFieldResult::InvalidConfig(ERR_P_FLAG_MISSING.to_string()),
+        dmarc.check_sp()
+    );
+
+    dmarc.p = Some(TagAction::None);
+    assert_eq!(
+        DmarcFieldResult::BadConfig(ERR_IGNORE_SUBDOMAIN_DMARC_FAILS.to_string()),
+        dmarc.check_sp()
+    );
+
+    dmarc.p = Some(TagAction::Reject);
+    assert_eq!(
+        DmarcFieldResult::VeryBadConfig(ERR_PERMITS_SUBDOMAIN_SPOOFING.to_string()),
+        dmarc.check_sp()
+    );
+
+    dmarc.p = Some(TagAction::Qurantine);
+    assert_eq!(
+        DmarcFieldResult::BadConfig(ERR_IGNORE_SUBDOMAIN_DMARC_FAILS.to_string()),
+        dmarc.check_sp()
+    );
+
+    dmarc.sp = Some(TagAction::Reject);
+    assert_eq!(DmarcFieldResult::ValidConfig, dmarc.check_sp());
+
+    dmarc.sp = Some(TagAction::Qurantine);
+    assert_eq!(DmarcFieldResult::ValidConfig, dmarc.check_sp());
 }
 
 #[test]
@@ -614,25 +653,25 @@ fn dmarc_check_v_and_p_order() {
 
     assert_eq!(
         Dmarc::check_v_and_p_order(&dmarc_entries),
-        DmarcFieldResult::Invalid(ERR_MISSING_V_OR_P_FLAG.to_string()),
+        DmarcFieldResult::InvalidConfig(ERR_MISSING_V_OR_P_FLAG.to_string()),
     );
 
     dmarc_entries.push(DmarcEntry::new("A", DMARC1));
     assert_eq!(
         Dmarc::check_v_and_p_order(&dmarc_entries),
-        DmarcFieldResult::Invalid(ERR_MISSING_V_OR_P_FLAG.to_string()),
+        DmarcFieldResult::InvalidConfig(ERR_MISSING_V_OR_P_FLAG.to_string()),
     );
 
     dmarc_entries.push(DmarcEntry::new("B", TAG_NONE));
     assert_eq!(
         Dmarc::check_v_and_p_order(&dmarc_entries),
-        DmarcFieldResult::Invalid(ERR_FIRST_FLAG_NOT_V.to_string()),
+        DmarcFieldResult::InvalidConfig(ERR_FIRST_FLAG_NOT_V.to_string()),
     );
 
     dmarc_entries[0] = DmarcEntry::new(V_TAG, DMARC1);
     assert_eq!(
         Dmarc::check_v_and_p_order(&dmarc_entries),
-        DmarcFieldResult::Invalid(ERR_SECOND_FLAG_NOT_P.to_string()),
+        DmarcFieldResult::InvalidConfig(ERR_SECOND_FLAG_NOT_P.to_string()),
     );
 
     dmarc_entries[1] = DmarcEntry::new(P_TAG, TAG_NONE);
