@@ -88,7 +88,7 @@ async fn write_dmarc_output_to_csv(
             Some(sr) => match sr {
                 // Write single DMARC record
                 parse::StringRecords::Single(s) => {
-                    let dmarc = parse::Dmarc::new(&domain_name, s);
+                    let dmarc = parse::Dmarc::new(&domain_name, Some(s));
                     output_dmarc_filewriter
                         .serialize::<parse::Dmarc>(dmarc)
                         .await
@@ -103,7 +103,7 @@ async fn write_dmarc_output_to_csv(
                 // Write multiple DMARC record
                 parse::StringRecords::Multiple(vs) => {
                     for s in vs {
-                        let dmarc = parse::Dmarc::new(&domain_name, s);
+                        let dmarc = parse::Dmarc::new(&domain_name, Some(s));
                         output_dmarc_filewriter
                             .serialize::<parse::Dmarc>(dmarc)
                             .await
