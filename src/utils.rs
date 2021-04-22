@@ -41,19 +41,21 @@ impl Config {
                     .takes_value(true),
             )
             .get_matches();
-       
+
         // If batch size exists set it to CLI argument, otherwise set it to default
         let batch_size = if args.occurrences_of("batch_size") > 0 {
             // Attempt to extract valid u32 from string CLI value
-            match args.value_of("batch_size")
-                    .unwrap()
-                    .parse::<usize>() {
-                        Ok(num) => num,
-                        Err(e) => {
-                            eprintln!("Cannot parse provided batch size '{}'\r\nUsing default!", e);
-                            DEFAULT_BATCH_SIZE
-                        }
-                    }
+            match args.value_of("batch_size").unwrap().parse::<usize>() {
+                Ok(0) => {
+                    eprintln!("Cannot parse provided batch size 'size must be larger than 0'\r\nUsing default!");
+                    DEFAULT_BATCH_SIZE
+                }
+                Ok(num) => num,
+                Err(e) => {
+                    eprintln!("Cannot parse provided batch size '{}'\r\nUsing default!", e);
+                    DEFAULT_BATCH_SIZE
+                }
+            }
         // Default condition
         } else {
             DEFAULT_BATCH_SIZE
@@ -64,7 +66,7 @@ impl Config {
         Self {
             input_domain_file: String::from(args.value_of("input_domain_file").unwrap()),
             output_dmarc_file: String::from(args.value_of("output_dmarc_file").unwrap()),
-            batch_size
+            batch_size,
         }
     }
 }
