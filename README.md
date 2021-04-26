@@ -35,6 +35,14 @@ You can increase or decrease the batch size by specifying `-b`, e.g.:
 
 The listed command will no parse the domains in batches of 100.
 
+#### Domain Examples
+We've tested the DMARC Checker against the following list of domains:
+- [UK Government](https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/842955/List_of_gov.uk_domain_names_as_at_28_Oct_2019.csv/preview)
+- [USA Government](https://github.com/cisagov/dotgov-data)
+- [Majestic Top 1 Million](https://blog.majestic.com/development/majestic-million-csv-daily)
+
+The repository contains a parse list of the above domains, and their results from DMARC Checker. Note that this was the current data as of the 26/04/2020.
+
 ### Notes
 Some DMARC records specify CNAME domains. We list these records with CNAME entries but DO NOT recursively check the CNAME tree.
 
