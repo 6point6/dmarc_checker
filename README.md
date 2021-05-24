@@ -1,7 +1,7 @@
 ## DMARC Checker
 DMARC Checker is a Rust powered asynchronous DMARC lookup engine.
 
-You can do for individual domains using dig, e.g. `dig dmarc.example.org TXT +short`. However, DMARC Checker works by reading a file of listed domains before outputting a parsed list in Comma Separated Value (CSV) format.
+You can the do for individual domains using dig, e.g. `dig dmarc.example.org TXT +short`. However, DMARC Checker works by reading a file of listed domains before outputting a parsed list in Comma Separated Value (CSV) format.
 
 Unlike dig, DMARC Check is fast. It averages around 500 lookups per second and can parse the top 1 million domains within 30 minutes.
 
