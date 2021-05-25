@@ -8,6 +8,11 @@ However, unlike dig, DMARC Check is fast. It averages around 500 lookups per sec
 ### Identifying Vulnerable Domains
 Please see the [Wiki](https://github.com/6point6/dmarc_checker/wiki) located here.
 
+* For guidance on checking and fixing your domain, please read this article. **UPDATE**
+* For an overview of email, SMTP and security technologies, please read this article. **UPDATE**
+* Acess our [Mail Spoofer](https://github.com/6point6/mail-spoofer) tool and how-to guides on the [Mail Spoofer Wiki](https://github.com/6point6/mail-spoofer/wiki).
+* For help identifying vulnerable domains, check out our tool [DMARC Checker](https://github.com/6point6/dmarc_checker) and its [Wiki](https://github.com/6point6/dmarc_checker/wiki)
+
 ### Build
 DMARC Checker is built in Rust, meaning you can compile it using the Cargo engine on Rust supported platforms. Within the Git directory, use the following commands.
 
