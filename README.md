@@ -11,7 +11,7 @@ Please see the [Wiki](https://github.com/6point6/dmarc_checker/wiki) located her
 * For guidance on checking and fixing your domain, please read this article. **UPDATE**
 * For an overview of email, SMTP and security technologies, please read this article. **UPDATE**
 * For an overview of the SPF, DKIM, DMARC and ARC weaknesses we exploit, check out this article. **UPDATE**
-* Acess our [Mail Spoofer](https://github.com/6point6/mail-spoofer) tool and how-to guides on the [Mail Spoofer Wiki](https://github.com/6point6/mail-spoofer/wiki).
+* Access our [Mail Spoofer](https://github.com/6point6/mail-spoofer) tool and how-to guides on the [Mail Spoofer Wiki](https://github.com/6point6/mail-spoofer/wiki).
 * For help identifying vulnerable domains, check out our tool [DMARC Checker](https://github.com/6point6/dmarc_checker) and its [Wiki](https://github.com/6point6/dmarc_checker/wiki).
 
 ### Build
@@ -21,7 +21,7 @@ DMARC Checker is built in Rust, meaning you can compile it using the Cargo engin
 `cargo build --release` for release versions.
 
 ### Usage
-Provide a file of domains with the `-i' flag, and specify a file to output for the `-o' flag.
+Provide a file of domains with the `-i' flag, and specify a file to output for the `-o' flag. The domain list needs to be a newline separated list of domains.
 
 **domain_list.txt**
 ```
