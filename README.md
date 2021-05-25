@@ -6,7 +6,7 @@ For individual domains, it's simpler to use the dig utility, e.g. `dig dmarc.exa
 However, unlike dig, DMARC Check is fast. It averages around 500 lookups per second and can parse the top 1 million domains within 30 minutes.
 
 ### Identifying Vulnerable Domains
-Please see the Wiki located here.
+Please see the [Wiki](https://github.com/6point6/dmarc_checker/wiki) located here.
 
 ### Build
 DMARC Checker is built in Rust, meaning you can compile it using the Cargo engine on Rust supported platforms. Within the Git directory, use the following commands.
