@@ -48,7 +48,8 @@ We've tested the DMARC Checker against the following list of domains.
 - [USA Government](https://github.com/cisagov/dotgov-data)
 - [Majestic Top 1 Million](https://blog.majestic.com/development/majestic-million-csv-daily)
 
-The repository contains a parse list of the above domains and their results from DMARC Checker. Note that this was the current data as of 26/04/2020.
+The repository contains a parse list of the above domains and their results from DMARC Checker. 
+**Note** the data was current as of 26/04/2020.
 
 ### Notes
 Some DMARC records specify CNAME domains. We list these records with CNAME entries but DO NOT recursively check the CNAME tree.
