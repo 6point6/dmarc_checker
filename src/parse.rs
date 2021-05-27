@@ -30,6 +30,7 @@ const ERR_FLAG_NOT_PRESENT: &str = "Flag not present";
 const ERR_MISSING_V_OR_P_FLAG: &str = "V or P flag missing";
 const ERR_FIRST_FLAG_NOT_V: &str = "First flag is not V";
 const ERR_SECOND_FLAG_NOT_P: &str = "Second flag is not P";
+const ERR_POLICY_IS_NONE: &str = "Policy is `none`";
 
 const ERR_P_FLAG_MISSING_AND_SP_NOT_SET: &str = "Missing p flag and sp not set";
 const ERR_P_FLAG_MISSING: &str = "P flag missing";
@@ -322,21 +323,34 @@ impl Dmarc {
 
     fn check_pct(&self) -> DmarcFieldResult {
         match &self.pct {
-            Some(p) => match &p.parse::<u8>() {
-                Ok(n) => {
-                    if *n < 25 {
-                        DmarcFieldResult::VeryBadConfig(p.clone())
-                    } else if *n < 100 {
-                        DmarcFieldResult::BadConfig(p.clone())
-                    } else if *n > 100 {
-                        DmarcFieldResult::InvalidConfig(p.clone())
-                    } else {
-                        DmarcFieldResult::ValidConfig
-                    }
-                }
+            Some(pct) => match &pct.parse::<u8>() {
+                Ok(n) => match &self.p {
+                    Some(p) => match p {
+                        TagAction::None => {
+                            DmarcFieldResult::VeryBadConfig(ERR_POLICY_IS_NONE.to_string())
+                        }
+                        TagAction::Qurantine => {
+                            if *n < 25 {
+                                DmarcFieldResult::VeryBadConfig(pct.clone())
+                            } else if *n < 100 {
+                                DmarcFieldResult::BadConfig(pct.clone())
+                            } else if *n > 100 {
+                                DmarcFieldResult::InvalidConfig(pct.clone())
+                            } else {
+                                DmarcFieldResult::ValidConfig
+                            }
+                        }
+                        TagAction::Reject => match *n > 100 {
+                            true => DmarcFieldResult::InvalidConfig(pct.clone()),
+                            false => DmarcFieldResult::ValidConfig,
+                        },
+                        TagAction::Invalid(i) => DmarcFieldResult::InvalidConfig(i.clone()),
+                    },
+                    None => DmarcFieldResult::InvalidConfig(ERR_P_FLAG_MISSING.to_string()),
+                },
                 Err(_) => DmarcFieldResult::InvalidConfig(format!(
                     "{} <- {}",
-                    p,
+                    pct,
                     "Is not a number".to_string()
                 )),
             },
@@ -581,17 +595,40 @@ fn dmarc_check_pct() {
     dmarc.pct = None;
     assert_eq!(DmarcFieldResult::ValidConfig, dmarc.check_pct());
 
+    let not_number = "a".to_string();
     let zero_pct = "0".to_string();
     let twenty_six_pct = "26".to_string();
     let one_hundred_pct = "100".to_string();
     let two_hundred_pct = "200".to_string();
 
+    dmarc.pct = Some(not_number.clone());
+    assert_eq!(
+        DmarcFieldResult::InvalidConfig(format!("{} <- Is not a number", not_number)),
+        dmarc.check_pct()
+    );
+
     dmarc.pct = Some(zero_pct.clone());
-    assert_eq!(DmarcFieldResult::VeryBadConfig(zero_pct), dmarc.check_pct());
+    assert_eq!(
+        DmarcFieldResult::InvalidConfig(ERR_P_FLAG_MISSING.to_string()),
+        dmarc.check_pct()
+    );
+
+    dmarc.p = Some(TagAction::None);
+    assert_eq!(
+        DmarcFieldResult::VeryBadConfig(ERR_POLICY_IS_NONE.to_string()),
+        dmarc.check_pct()
+    );
+
+    dmarc.p = Some(TagAction::Qurantine);
+    dmarc.pct = Some(zero_pct.clone());
+    assert_eq!(
+        DmarcFieldResult::VeryBadConfig(zero_pct.clone()),
+        dmarc.check_pct()
+    );
 
     dmarc.pct = Some(twenty_six_pct.clone());
     assert_eq!(
-        DmarcFieldResult::BadConfig(twenty_six_pct),
+        DmarcFieldResult::BadConfig(twenty_six_pct.clone()),
         dmarc.check_pct()
     );
 
@@ -600,9 +637,19 @@ fn dmarc_check_pct() {
 
     dmarc.pct = Some(two_hundred_pct.clone());
     assert_eq!(
-        DmarcFieldResult::InvalidConfig(two_hundred_pct),
+        DmarcFieldResult::InvalidConfig(two_hundred_pct.clone()),
         dmarc.check_pct()
     );
+
+    dmarc.p = Some(TagAction::Reject);
+    dmarc.pct = Some(two_hundred_pct.clone());
+    assert_eq!(
+        DmarcFieldResult::InvalidConfig(two_hundred_pct.clone()),
+        dmarc.check_pct()
+    );
+
+    dmarc.pct = Some(twenty_six_pct.clone());
+    assert_eq!(DmarcFieldResult::ValidConfig, dmarc.check_pct());
 }
 
 #[test]
