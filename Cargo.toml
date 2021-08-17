@@ -1,0 +1,21 @@
+[package]
+name = "dmarc_checker"
+version = "1.0.1"
+authors = ["Chris <chris.powell@6point6.co.uk>", "Orson <orson.mosley@6poin6.co.uk>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+trust-dns-client = "0.20.1"
+trust-dns-proto = "0.20.1" 
+tokio = { version = "1", features = ["full"] }
+futures = "0.3.13"
+rand = "0.8.3"
+clap = "2.33.3"
+serde = { version = "1.0", features = ["derive"] }
+env_logger = "0.7.1"
+csv-async = { version = "1.2.0", features = ["tokio"] }
+
+[dev-dependencies]
+pretty_assertions = "0.7.1"

@@ -1,0 +1,7 @@
+# Files
+.*.swp
+dmarc_checker_linux*
+dmarc_checker_win*
+# Folders
+/target
+/test_data
