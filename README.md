@@ -8,9 +8,6 @@ However, unlike dig, DMARC Check is fast. It averages around 500 lookups per sec
 ### Identifying Vulnerable Domains
 Please see the [Wiki](https://github.com/6point6/dmarc_checker/wiki) located here.
 
-* For guidance on checking and fixing your domain, please read this article. **UPDATE**
-* For an overview of email, SMTP and security technologies, please read this article. **UPDATE**
-* For an overview of the SPF, DKIM, DMARC and ARC weaknesses we exploit, check out this article. **UPDATE**
 * Access our [Mail Spoofer](https://github.com/6point6/mail-spoofer) tool and how-to guides on the [Mail Spoofer Wiki](https://github.com/6point6/mail-spoofer/wiki).
 * For help identifying vulnerable domains, check out our tool [DMARC Checker](https://github.com/6point6/dmarc_checker) and its [Wiki](https://github.com/6point6/dmarc_checker/wiki).
 
@@ -53,9 +50,6 @@ We've tested the DMARC Checker against the following list of domains.
 - [UK Government](https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/842955/List_of_gov.uk_domain_names_as_at_28_Oct_2019.csv/preview)
 - [USA Government](https://github.com/cisagov/dotgov-data)
 - [Majestic Top 1 Million](https://blog.majestic.com/development/majestic-million-csv-daily)
-
-The repository contains a parse list of the above domains and their results from DMARC Checker. 
-**Note** the data was current as of 26/04/2020.
 
 ### Notes
 Some DMARC records specify CNAME domains. We list these records with CNAME entries but DO NOT recursively check the CNAME tree.
